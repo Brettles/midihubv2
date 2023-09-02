@@ -1,0 +1,465 @@
+#
+# Create an instance to act as a MIDI "hub". Assumes the presence of the
+# default VPC in the chosen region.
+#
+# Requires purchase of https://mclarenlabs.com/#rtpmidi (US$8)
+#
+# Further information: https://github.com/Brettles/midihubv2
+#
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy MidiHub on Ubuntu - v2
+
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+    - t3.nano
+    - t3.micro
+    - t3.small
+    - t3.medium
+    - t3.large
+    - t3.xlarge
+    - m5.large
+    - c5.large
+    ConstraintDescription: Must be a valid EC2 instance type.
+
+Outputs:
+  ElasticIP:
+    Description: Public IP address of MIDI hub server
+    Value: !Ref ElasticIP
+  GlobalIP:
+    Description: Globally available IP addresses of MIDI hub server
+    Value: !Join [',', !GetAtt GlobalAccelerator.Ipv4Addresses]
+  CloudFrontDistribution:
+    Value: !Ref CloudFrontDistribution
+  LatencyStatisticsPage:
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}/midihub.html'
+  APIGatewayEndpoint:
+    Description: Substitute into latency.html
+    Value: !Sub ${APIGateway.ApiEndpoint}
+
+Mappings:
+  RegionMap:
+    ap-south-2:
+      ami: ami-04a5a6be1fa530f1c
+    ap-south-1:
+      ami: ami-0f5ee92e2d63afc18
+    eu-south-1:
+      ami: ami-0c7f4b046aa261c2d
+    eu-south-2:
+      ami: ami-0cf7f04935376b249
+    me-central-1:
+      ami: ami-07fd1de5f10a3eb14
+    ca-central-1:
+      ami: ami-0ea18256de20ecdfc
+    eu-central-1:
+      ami: ami-04e601abe3e1a910f
+    eu-central-2:
+      ami: ami-04dbb668869bef978
+    us-west-1:
+      ami: ami-0f8e81a3da6e2510a
+    us-west-2:
+      ami: ami-03f65b8614a860c29
+    af-south-1:
+      ami: ami-02a9d4cace1c5a38a
+    eu-north-1:
+      ami: ami-0989fb15ce71ba39e
+    eu-west-3:
+      ami: ami-05b5a865c3579bbc4
+    eu-west-2:
+      ami: ami-0eb260c4d5475b901
+    eu-west-1:
+      ami: ami-01dd271720c1ba44f
+    ap-northeast-3:
+      ami: ami-0da13880f921c96a5
+    ap-northeast-2:
+      ami: ami-0c9c942bd7bf113a2
+    me-south-1:
+      ami: ami-01991fdb9bf56bfb8
+    ap-northeast-1:
+      ami: ami-0d52744d6551d851e
+    sa-east-1:
+      ami: ami-0af6e9042ea5a4e3e
+    ap-east-1:
+      ami: ami-05ec72576b2b4738f
+    ap-southeast-1:
+      ami: ami-0df7a207adb9748c7
+    ap-southeast-2:
+      ami: ami-0310483fb2b488153
+    ap-southeast-3:
+      ami: ami-0913922d1289852b6
+    ap-southeast-4:
+      ami: ami-0ccbb4123e662e194
+    us-east-1:
+      ami: ami-053b0d53c279acc90
+    us-east-2:
+      ami: ami-024e6efaf93d85776
+
+Resources:
+  MidiHubInstance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            "/home/ubuntu/cloudformationstackname":
+              content: !Sub ${AWS::StackName}
+              mode: '000644'
+              owner: ubuntu
+              group: ubuntu
+            "/home/ubuntu/.aws/config":
+              content: !Sub |
+                [default]
+                region = ${AWS::Region}
+              mode: '000644'
+              owner: ubuntu
+              group: ubuntu
+            "/home/ubuntu/crontab.ubuntu":
+              content: !Sub | 
+                @reboot rm /home/ubuntu/output-*.log
+                * * * * * (cd /home/ubuntu/midihubv2/; ./midihub.py) >>/home/ubuntu/output.log 2>&1
+                * * * * * (cd /home/ubuntu; grep Latency *.log | ./midihubv2/update-latency.py)
+              mode: '000644'
+              owner: ubuntu
+              group: ubuntu
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref AWS::Region, ami]
+      InstanceType: !Ref InstanceType
+      Tags:
+      - Key: Name
+        Value: midiHubv2
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds:
+      - !Ref SecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          apt-get update -y
+          apt-get upgrade -y
+          apt-get install python3-pip -y
+          mkdir -p /opt/aws/
+          pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          ln -s /usr/local/init/ubuntu/cfn-hup /etc/init.d/cfn-hup
+          /usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource MidiHubInstance --region ${AWS::Region}
+          /usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MidiHubInstance --region ${AWS::Region}
+          apt-get install alsa-base linux-modules-6.2.0-1009-lowlatency -y
+          pip3 install boto3
+          git clone https://github.com/Brettles/midihubv2
+          cd midihubv2
+          chmod +x midihub.py update-latency.py create-s3-bucket.py
+          ./create-s3-bucket.py
+          cd /home/ubuntu
+          chown -R ubuntu:ubuntu *
+          crontab -u ubuntu crontab.first.ubuntu
+          reboot
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 'midiHubv2-${AWS::StackName}'
+      GroupDescription: Enable SSH and RTP for MIDI
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: udp
+        FromPort: 5000
+        ToPort: 6000
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: icmp
+        FromPort: -1
+        ToPort: -1
+        CidrIp: 0.0.0.0/0
+
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    DependsOn: MidiHubInstance
+    Properties: 
+      InstanceId: !Ref MidiHubInstance
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'midiHubv2-EC2-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: CloudFormation
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - cloudformation:DescribeStacks
+            Resource: !Sub ${AWS::StackId}
+      - PolicyName: DynamoDB
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: 
+            - dynamodb:BatchWriteItem
+            - dynamodb:PutItem
+            Resource: !GetAtt DynamoDBTable.Arn
+      - PolicyName: CloudFront
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            -  cloudfront:GetDistributionConfig
+            -  cloudfront:UpdateDistribution
+            Resource: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+      - PolicyName: CloudFrontOAC
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: cloudfront:CreateOriginAccessControl
+            Resource: '*'
+      - PolicyName: S3
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            -  s3:CreateBucket
+            -  s3:PutBucketPolicy
+            -  s3:PutObject
+            Resource: '*'
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      InstanceProfileName: !Sub 'midiHubv2-${AWS::StackName}'
+      Path: /
+      Roles: 
+      - !Ref InstanceRole
+
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'midiHubv2-${AWS::StackName}'
+      AttributeDefinitions:
+      - AttributeName: "clientId"
+        AttributeType: "S"
+      KeySchema:
+      - AttributeName: "clientId"
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      TimeToLiveSpecification:
+        Enabled: True
+        AttributeName: expiryTime
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'midiHubv2-Lambda-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            Action:
+            - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+            - sts:AssumeRole
+
+  DynamoDBPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DynamoDB
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Resource: !GetAtt DynamoDBTable.Arn
+            Action:
+            - dynamodb:Scan
+            - dynamodb:GetItem
+      Roles:
+        - !Ref LambdaRole
+
+  LambdaGetLatencyStats:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'midiHubv2-GetLatencyStats-${AWS::StackName}'
+      Handler: index.lambda_handler
+      Runtime: python3.11
+      Architectures: [arm64]
+      Timeout: 20
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref DynamoDBTable
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import logging
+          
+          dynamodb = boto3.client('dynamodb')
+          
+          tableName = os.environ.get('TableName')
+          
+          logging.basicConfig()
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          
+          def lambda_handler(event, context):
+              global logger, tableName
+          
+              if not tableName:
+                  logger.error('TableName not set - stopping')
+                  return {'statusCode':500, 'body':'TableName not set'}
+          
+              paginator = dynamodb.get_paginator('scan')
+              iterator = paginator.paginate(TableName=tableName)
+          
+              output = []
+              for page in iterator:
+                  for stat in page['Items']:
+                      if stat['clientId']['S'] == 'Participants': continue
+
+                      try:
+                          (name,port) = stat['clientId']['S'].split('-')
+
+                          item = {'clientName':name, 'clientPort':port, 'timestamp': stat['timestamp']['N'],
+                                  'averageLatency':stat['averageLatency']['S'], 'maxLatency':stat['maxLatency']['S'],
+                                  'minLatency':stat['minLatency']['S'], 'lastLatency':stat['lastLatency']['S']}
+                      except:
+                          logger.error(f'Cannot interpret item {stat}')
+                          continue
+          
+                      output.append(item)
+
+              return(output)
+
+  APIGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub 'midiHubv2-${AWS::StackName}'
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowHeaders:
+        - "*"
+        AllowMethods:
+        - "*"
+        ExposeHeaders:
+        - "*"
+        AllowOrigins:
+        - "*"
+
+  APIGatewayStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref APIGateway
+      AutoDeploy: True
+      StageName: $default
+
+  IntegrationLatencyStats:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref APIGateway
+      IntegrationType: AWS_PROXY
+      IntegrationMethod: POST
+      PayloadFormatVersion: 2.0
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:midiHubv2-GetLatencyStats-${AWS::StackName}/invocations"
+
+  ApiRouteLatencyStats:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref APIGateway
+      RouteKey: "GET /latency"
+      Target: !Join ["/", ["integrations", !Ref "IntegrationLatencyStats"]]
+
+  LambdaPermissionLatencyStats:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Ref LambdaGetLatencyStats
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGateway}/*/*/latency"
+
+  GlobalAccelerator:
+    Type: AWS::GlobalAccelerator::Accelerator
+    Properties:
+      Name: !Sub 'mibiHubv2-${AWS::StackName}'
+      IpAddressType: IPV4
+      Enabled: True
+
+  GlobalAcceleratorListener:
+    Type: AWS::GlobalAccelerator::Listener
+    Properties:
+      AcceleratorArn: !Ref GlobalAccelerator
+      ClientAffinity: SOURCE_IP
+      Protocol: UDP
+      PortRanges:
+      - FromPort: 5000
+        ToPort: 6000
+
+  GlobalAcceleratorEndpoint:
+    Type: AWS::GlobalAccelerator::EndpointGroup
+    Properties:
+      ListenerArn: !Ref GlobalAcceleratorListener
+      EndpointGroupRegion: !Sub ${AWS::Region}
+      HealthCheckPort: 22
+      HealthCheckProtocol: TCP
+      EndpointConfigurations:
+      - EndpointId: !GetAtt ElasticIP.AllocationId
+
+  #
+  # Dummy CloudFront distribution which will be modified when the EC2 instance
+  # starts. A script on the instance will create a S3 bucket; modify the base
+  # HTML file with the Lambda function URL; then update the CloudFront
+  # distribution to point to the bucket.
+  #
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub 'mibiHubv2-${AWS::StackName}'
+        DefaultRootObject: index.html
+        Enabled: true
+        HttpVersion: http2
+        PriceClass: 'PriceClass_All'
+        Origins:
+        - Id: DefaultOrigin
+          DomainName: aws.amazon.com
+          CustomOriginConfig:
+            OriginProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - GET
+          - HEAD
+          - OPTIONS
+          TargetOriginId: DefaultOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
