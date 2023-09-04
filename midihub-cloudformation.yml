@@ -39,7 +39,7 @@ Outputs:
   CloudFrontDistribution:
     Value: !Ref CloudFrontDistribution
   LatencyStatisticsPage:
-    Value: !Sub 'https://${CloudFrontDistribution.DomainName}/midihub.html'
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}/latency.html'
   APIGatewayEndpoint:
     Description: Substitute into latency.html
     Value: !Sub ${APIGateway.ApiEndpoint}
