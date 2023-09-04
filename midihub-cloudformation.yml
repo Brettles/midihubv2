@@ -43,6 +43,8 @@ Outputs:
   APIGatewayEndpoint:
     Description: Substitute into latency.html
     Value: !Sub ${APIGateway.ApiEndpoint}
+  DynamoDBTableName:
+    Value: !Ref DynamoDBTable
 
 Mappings:
   RegionMap:
