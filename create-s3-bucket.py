@@ -75,7 +75,7 @@ def main():
     except Exception as e:
         logger.error(f'Cannot read HTML latency source file: {e}')
 
-    newLatencyHTML = originalLatencyHTML.replace('--APIGATEWAYEDNPOINT--', apiGatewayEndpoint+'/latency')
+    newLatencyHTML = originalLatencyHTML.replace('--APIGATEWAYENDPOINT--', apiGatewayEndpoint+'/latency')
 
     try:
         response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document')
