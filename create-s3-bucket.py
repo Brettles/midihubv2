@@ -69,8 +69,8 @@ def main():
         return
 
     cfn = boto3.client('cloudformation', region_name=regionName)
-    cloudfront = boto3.client('cloudfront', region_name=regionName))
-    s3 = boto3.client('s3', region_name=regionName))
+    cloudfront = boto3.client('cloudfront', region_name=regionName)
+    s3 = boto3.client('s3', region_name=regionName)
 
     try:
         response = cfn.describe_stacks(StackName=stackName)
