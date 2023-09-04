@@ -46,7 +46,32 @@ def main():
         logger.error(f'Cannot read CloudFormation stack name: {e}')
         return
 
-    cfn = boto3.client('cloudformation')
+    #
+    # We need some information - and the region name is key here because the default
+    # (written to ~/.aws/config) may not have been written by the time that this is
+    # run so we need to specify it explicitly.
+    #
+    try:
+        response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document')
+        instanceInfo = json.loads(response.content)
+    except:
+        logger.info('Did not get instance metadata')
+        return
+
+    regionName = instanceInfo.get('region')
+    if not regionName:
+        logger.warning('No region name in instance metadata')
+        return
+
+    accountId = instanceInfo.get('accountId')
+    if not regionName:
+        logger.warning('No account id in instance metadata')
+        return
+
+    cfn = boto3.client('cloudformation', region_name=regionName)
+    cloudfront = boto3.client('cloudfront', region_name=regionName))
+    s3 = boto3.client('s3', region_name=regionName))
+
     try:
         response = cfn.describe_stacks(StackName=stackName)
     except Exception as e:
@@ -76,26 +101,6 @@ def main():
         logger.error(f'Cannot read HTML latency source file: {e}')
 
     newLatencyHTML = originalLatencyHTML.replace('--APIGATEWAYENDPOINT--', apiGatewayEndpoint+'/latency')
-
-    try:
-        response = requests.get('http://169.254.169.254/latest/dynamic/instance-identity/document')
-        instanceInfo = json.loads(response.content)
-    except:
-        logger.info('Did not get instance metadata')
-        return
-
-    regionName = instanceInfo.get('region')
-    if not regionName:
-        logger.warning('No region name in instance metadata')
-        return
-
-    accountId = instanceInfo.get('accountId')
-    if not regionName:
-        logger.warning('No account id in instance metadata')
-        return
-
-    cloudfront = boto3.client('cloudfront')
-    s3 = boto3.client('s3')
 
     try:
         config = cloudfront.get_distribution_config(Id=cloudFrontDistribution)
