@@ -346,18 +346,27 @@ Resources:
               output = []
               for page in iterator:
                   for stat in page['Items']:
-                      if stat['clientId']['S'] == 'Participants': continue
-
                       try:
-                          (name,port) = stat['clientId']['S'].split('-')
+                          clientId = stat['clientId']['S']
+                          hyphen = clientId.rfind('-')
+                          if hyphen == -1:
+                              name = clientId
+                              port = '????'
+                          else:
+                              name = clientId[:hyphen]
+                              port = clientId[hyphen+1:]
 
                           item = {'clientName':name, 'clientPort':port, 'timestamp': stat['timestamp']['N'],
                                   'averageLatency':stat['averageLatency']['S'], 'maxLatency':stat['maxLatency']['S'],
-                                  'minLatency':stat['minLatency']['S'], 'lastLatency':stat['lastLatency']['S']}
-                      except:
+                                  'minLatency':stat['minLatency']['S'], 'lastLatency':stat['lastLatency']['S'],
+                                  'maxLatencyTime':stat['maxLatencyTime']['N'], 'minLatencyTime':stat['minLatencyTime']['N'],
+                                  'lastLatencyTime':stat['lastLatencyTime']['N']
+                          }
+                      except Exception as e:
                           logger.error(f'Cannot interpret item {stat}')
+                          logger.error(e)
                           continue
-          
+
                       output.append(item)
 
               return(output)
