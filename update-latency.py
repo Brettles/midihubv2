@@ -22,6 +22,7 @@ import re
 
 logger = None
 dynamodb = boto3.resource('dynamodb')
+cfn = boto3.client('cloudformation')
 
 def main():
     global logger
@@ -30,20 +31,34 @@ def main():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
-#    try:
-#        with open('dynamodbtable') as ddbfile:
-#            tableName = ddbfile.read().strip()
-#    except FileNotFoundError:
-#        logger.error('No table name file found - stopping')
-#        sys.exit(1)
-#    except Exception as e:
-#        logger.error(f'Cannot read table name: {e}')
-#        sys.exit(1)
+    try:
+        with open('cloudformationstackname') as cfnfile: # Is run from the parent directory
+            stackName = cfnfile.read().strip()
+    except FileNotFoundError:
+        logger.error('No CloudFormation stack name file found - stopping')
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f'Cannot read CloudFormation stack name: {e}')
+        sys.exit(1)
 
-#    ddbTable = dynamodb.Table(tableName)
+    try:
+        response = cfn.describe_stacks(StackName=stackName)
+    except Exception as e:
+        logger.error(f'Cannot get stack information: {e}')
+        sys.exit(1)
+
+    tableName = ''
+    for output in response['Stacks'][0]['Outputs']:
+        if output['OutputKey'] == 'DynamoDBTableName': tableName = output['OutputValue']
+
+    if not tableName:
+        logger.error('Did not find DynamoDB table name')
+        sys.exit(1)
+
     latencyStats = {}
     maxLatency = {}
     minLatency = {}
+    lastLatency = {}
 
     for line in sys.stdin:
         latencyMarker = line.find('rtt: ')
@@ -71,28 +86,29 @@ def main():
         if id not in latencyStats: latencyStats[id] = []
         if id not in maxLatency: maxLatency[id] = (None, 0)
         if id not in minLatency: minLatency[id] = (None, 9999)
+        if id not in lastLatency: lastLatency[id] = ''
 
         latencyStats[id].append(latencyValue)
-
         if latencyValue > maxLatency[id][1]: maxLatency[id] = (timestamp, latencyValue)
         if latencyValue < minLatency[id][1]: minLatency[id] = (timestamp, latencyValue)
+        lastLatency[id] = timestamp
 
-    print(latencyStats)
-    print(maxLatency)
-    print(minLatency)
-#    with ddbTable.batch_writer() as batch:
-#        for id in latencyStats:
-#            average = round(sum(latencyStats[id])/len(latencyStats[id]), 1)
-#
-#            now = int(time.time())
-#            expiry = now+86400
-#
-#            # Need to store floats as strings because DynamoDB doesn't support
-#            # float typess here
-#            item = {'clientId':id, 'timestamp':now, 'expiryTime':expiry,
-#                    'lastLatency':str(latencyStats[id][-1]), 'averageLatency':str(average),
-#                    'maxLatency': str(max(latencyStats[id])), 'minLatency':str(min(latencyStats[id]))}
-#            batch.put_item(Item=item)
+    ddbTable = dynamodb.Table(tableName)
+    with ddbTable.batch_writer() as batch:
+        for id in latencyStats:
+            average = round(sum(latencyStats[id])/len(latencyStats[id]), 1)
+
+            now = int(time.time())
+            expiry = now+(86400*7) # Expire this record in seven days
+
+            # Need to store floats as strings because DynamoDB doesn't support
+            # float typess here
+            item = {'clientId':id, 'timestamp':now, 'expiryTime':expiry,
+                    'lastLatency':str(latencyStats[id][-1]), 'lastLatencyTime':lastLatency[id],
+                    'maxLatency':str(maxLatency[id][0]), 'maxLatencyTime':str(maxLatency[id][1]),
+                    'minLatency':str(minLatency[id][0]), 'minLatencyTime':str(minLatency[id][1]),
+                    'averageLatency':str(average)}
+            batch.put_item(Item=item)
 
 if __name__ == "__main__":
     main()
