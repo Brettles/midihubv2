@@ -124,7 +124,7 @@ Resources:
               content: !Sub | 
                 @reboot rm /home/ubuntu/output-*.log
                 * * * * * (cd /home/ubuntu/midihubv2/; ./midihub.py) >>/home/ubuntu/output.log 2>&1
-                * * * * * (cd /home/ubuntu; grep Latency *.log | ./midihubv2/update-latency.py)
+                * * * * * (cd /home/ubuntu; grep rtt *.log | ./midihubv2/update-latency.py)
               mode: '000644'
               owner: ubuntu
               group: ubuntu
