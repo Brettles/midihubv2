@@ -92,7 +92,7 @@ def checkDaemon():
             if os.fork() == 0: # We are the child process
                 name = f'midiHub-{group}-{port}';
 
-                newStdErr = os.open(f'output-{port}.log', os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+                newStdErr = os.open(f'../output-{port}.log', os.O_WRONLY|os.O_CREAT|os.O_APPEND)
                 os.dup2(newStdErr, sys.stderr.fileno())
                 os.close(newStdErr)
                 os.close(1) # Close STDOUT
