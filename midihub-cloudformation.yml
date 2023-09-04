@@ -151,13 +151,14 @@ Resources:
           /usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MidiHubInstance --region ${AWS::Region}
           apt-get install alsa-base linux-modules-6.2.0-1009-lowlatency -y
           pip3 install boto3
+          cd /home/ubuntu
           git clone https://github.com/Brettles/midihubv2
           cd midihubv2
           chmod +x midihub.py update-latency.py create-s3-bucket.py
           ./create-s3-bucket.py
           cd /home/ubuntu
           chown -R ubuntu:ubuntu *
-          crontab -u ubuntu crontab.first.ubuntu
+          crontab -u ubuntu crontab.ubuntu
           reboot
 
   SecurityGroup:

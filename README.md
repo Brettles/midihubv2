@@ -8,9 +8,9 @@ But there will be bumps along the way if you intend on hosting your Internet-bas
 
 This (somewhat tiny!) repo is here to help. Especially if you want to do this with Linux. And it's v2 because this is slightly different to my original repo because it uses a different RTP MIDI library to communicate.
 
-Linux can solve the first problem (virtual sound card) by supplying a "dummy" sound card, even in a virtual server environment. Without this, most applications that use the [Alsa](https://wiki.archlinux.org/title/Advanced_Linux_Sound_Architecture) libraries won't work. That includes anything that wants to use MIDI. Even if you have the Alsa tools and libraries installed, if there isn't a sound card present then everything just fails.
+Linux can solve the first problem (virtual sound card) by supplying a "dummy" sound card, even in a virtual server environment. Without this, most applications that use the [ALSA](https://wiki.archlinux.org/title/Advanced_Linux_Sound_Architecture) libraries won't work. That includes anything that wants to use MIDI. Even if you have the ALSA tools and libraries installed, if there isn't a sound card present then everything just fails.
 
-The second problem is solve using Alsa as well - there is a command-line tool called `aconnect` which allows you to join those MIDI sources and targets with each other.
+The second problem is solved using ALSA as well - there is a command-line tool called `aconnect` which allows you to join those MIDI sources and targets with each other.
 
 The final piece of the puzzle is the different [RTP MIDI handler from McLaren Labs](https://mclarenlabs.com/rtpmidi/). Note that this is software you must purchase - it is not included in this repo. The instructions below will tell you how to install it but you must buy it from them.
 
@@ -121,7 +121,6 @@ You might want to run this on your own (non-AWS) virtual machine. In AWS this ru
 
 You'll need the following packages installed:
 
-- python3-pip
 - alsa-base
 - linux-modules-6.2.0-1009-lowlatency - one of the prerequisites is the dummy sound card; it is this package in Ubuntu which installs it
 
