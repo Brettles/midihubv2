@@ -16,7 +16,7 @@
 import sys
 import logging
 import boto3
-import time
+import datetime
 import sys
 import re
 
@@ -77,6 +77,7 @@ def main():
             portNumber = re.findall(r'\d+', line[:15])[0]
 
             timestamp = line[16:35]
+            epochTime = int(datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S').timestamp())
         except Exception as e:
             logger.error(f'Failed to parse line: {e}')
             logger.error(line)
@@ -89,24 +90,24 @@ def main():
         if id not in lastLatency: lastLatency[id] = ''
 
         latencyStats[id].append(latencyValue)
-        if latencyValue > maxLatency[id][1]: maxLatency[id] = (timestamp, latencyValue)
-        if latencyValue < minLatency[id][1]: minLatency[id] = (timestamp, latencyValue)
-        lastLatency[id] = timestamp
+        if latencyValue > maxLatency[id][1]: maxLatency[id] = (epochTime, latencyValue)
+        if latencyValue < minLatency[id][1]: minLatency[id] = (epochTime, latencyValue)
+        lastLatency[id] = epochTime
 
     ddbTable = dynamodb.Table(tableName)
     with ddbTable.batch_writer() as batch:
         for id in latencyStats:
             average = round(sum(latencyStats[id])/len(latencyStats[id]), 1)
 
-            now = int(time.time())
+            now = int(datetime.datetime.now().timestamp())
             expiry = now+(86400*7) # Expire this record in seven days
 
             # Need to store floats as strings because DynamoDB doesn't support
             # float typess here
             item = {'clientId':id, 'timestamp':now, 'expiryTime':expiry,
                     'lastLatency':str(latencyStats[id][-1]), 'lastLatencyTime':lastLatency[id],
-                    'maxLatency':str(maxLatency[id][0]), 'maxLatencyTime':str(maxLatency[id][1]),
-                    'minLatency':str(minLatency[id][0]), 'minLatencyTime':str(minLatency[id][1]),
+                    'maxLatency':str(maxLatency[id][1]), 'maxLatencyTime':maxLatency[id][0],
+                    'minLatency':str(minLatency[id][1]), 'minLatencyTime':minLatency[id][0],
                     'averageLatency':str(average)}
             batch.put_item(Item=item)
 
