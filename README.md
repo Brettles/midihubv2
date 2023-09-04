@@ -58,7 +58,7 @@ Once complete you will need to download rtpmidi from McLaren labs and install it
 
 If you encounter errors then perform the following steps:
 ```
-sudo apt --fix-broken install
+sudo apt-get --fix-broken install -y
 sudo dpkg -i rtpmidi_1.1.2-ubuntu22.04_amd64.deb
 ```
 
