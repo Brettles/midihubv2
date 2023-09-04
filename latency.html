@@ -19,6 +19,16 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
 
   <script>
+   function dateString(date) {
+    return(date.toLocaleString('default',{'weekday':'short'})+' '+
+          date.toLocaleString('default',{'month':'short'})+' '+
+          date.getDate()+' '+
+          date.getFullYear()+' '+
+          date.getHours().toString().padStart(2,'0')+':'+
+          date.getMinutes().toString().padStart(2,'0')+':'+
+          date.getSeconds().toString().padStart(2,'0'))
+   }
+
    function getLatency() {
     $('.latency').empty();
 
@@ -26,19 +36,22 @@
      url: '--APIGATEWAYENDPOINT--'
     }).then(function(data) {
      var div = '<table class="table table-striped table-borderless table-sm w-auto mx-auto mt-2">';
-     div += '<thead><tr class="text-center"><th>Client</th><th>Port</th><th>Time</th><th>Average</th><th>Min</th><th>Max</th><th>Last</th></tr></thead>';
+     div += '<thead><tr class="text-center"><th>Client</th><th>Hub Port</th><th>Last Updated Time</th><th>Average</th><th>Min</th><th>Max</th><th>Last</th></tr></thead>';
      for (line of data) {
       div += '<tr>';
       div += '<td class="px-3">'+line['clientName']+'</td>';
-      div += '<td class="px-3">'+line['clientPort']+'</td>';
+      div += '<td class="px-3 text-center">'+line['clientPort']+'</td>';
 
-      const when = new Date(line['timestamp']*1000);
-      div += '<td class="px-3">'+when+'</td>';
+      const lastUpdate = dateString(new Date(line['timestamp']*1000));
+      const lastMaxTime = dateString(new Date(line['maxLatencyTime']*1000));
+      const lastMinTime = dateString(new Date(line['minLatencyTime']*1000));
+      const lastLatencyTime = dateString(new Date(line['lastLatencyTime']*1000));
 
-      div += '<td class="px-3">'+line['averageLatency']+ ' ms</td>'; 
-      div += '<td class="px-3">'+line['minLatency']+ ' ms</td>'; 
-      div += '<td class="px-3">'+line['maxLatency']+ ' ms</td>'; 
-      div += '<td class="px-3">'+line['lastLatency']+ ' ms</td>'; 
+      div += '<td class="px-3 text-center">'+lastUpdate+'</td>';
+      div += '<td class="px-3 text-center">'+line['averageLatency']+ ' ms</td>'; 
+      div += '<td class="px-3 text-center">'+line['minLatency']+ ' ms<br>'+lastMinTime+'</td>'; 
+      div += '<td class="px-3 text-center">'+line['maxLatency']+ ' ms<br>'+lastMaxTime+'</td>'; 
+      div += '<td class="px-3 text-center">'+line['lastLatency']+ ' ms<br>'+lastLatencyTime+'</td>'; 
 
       div += '</tr>';
      }
