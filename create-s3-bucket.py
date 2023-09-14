@@ -64,7 +64,7 @@ def main():
         return
 
     accountId = instanceInfo.get('accountId')
-    if not regionName:
+    if not accountId:
         logger.warning('No account id in instance metadata')
         return
 
@@ -144,7 +144,7 @@ def main():
         return
 
     originItem = config['DistributionConfig']['Origins']['Items'][0]
-    originItem['DomainName'] = f'{randomName}.s3.amazonaws.com'
+    originItem['DomainName'] = f'{randomName}.s3.{regionName}.amazonaws.com'
     originItem['OriginAccessControlId'] = oac['OriginAccessControl']['Id']
     originItem['S3OriginConfig'] = {'OriginAccessIdentity':''}
     if 'CustomOriginConfig' in originItem:
