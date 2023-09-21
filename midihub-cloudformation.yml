@@ -151,7 +151,7 @@ Resources:
           ln -s /usr/local/init/ubuntu/cfn-hup /etc/init.d/cfn-hup
           /usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource MidiHubInstance --region ${AWS::Region}
           /usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MidiHubInstance --region ${AWS::Region}
-          apt-get install alsa-base avahi-utils linux-modules-6.2.0-1009-lowlatency -y
+          apt-get install alsa-base avahi-utils linux-modules-6.2.0-1013-lowlatency -y
           pip3 install boto3
           cd /home/ubuntu
           git clone https://github.com/Brettles/midihubv2
