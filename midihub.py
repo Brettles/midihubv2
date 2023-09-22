@@ -230,6 +230,13 @@ def configure(singal, frame):
         midiPorts = json.loads(portsList)
     except FileNotFoundError: # No ports file found - that's quite ok
         logger.info('No ports file found - using defaults')
+
+        #
+        # But because our stuck note fixer-upper needs to know the same port
+        # numbers we will write out the values we're given.
+        #
+        with open('midiports', 'w') as portsFile:
+            portsFile.write(json.dumps(midiPorts))
     except Exception as e:
         logger.warning(f'Got error {e} - ports file badly formatted?')
 
