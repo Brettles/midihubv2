@@ -74,7 +74,7 @@ def main():
                 continue
 
 def configure():
-    global logger, midiPorts, transmitPorts, tableName, alsaClients
+    global logger, midiPorts, transmitPorts, sqsQueueUrl, tableName, alsaClients
 
     logging.basicConfig()
     logger = logging.getLogger()
