@@ -46,11 +46,15 @@ def main():
     signal.signal(signal.SIGINT, interrupted)
     signal.signal(signal.SIGHUP, configure)
 
-    configure('', '')
+    logging.basicConfig()
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
 
     if alreadyRunning():
         logger.info('This is the second copy - stopping')
         sys.exit(0)
+
+    configure('', '')
 
     if not checkPrerequisites():
         sys.exit(1)
@@ -218,10 +222,6 @@ def checkPrerequisites():
 #
 def configure(singal, frame):
     global logger, location, midiPorts, connectInAndOut
-
-    logging.basicConfig()
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
 
     try:
         with open('midiports') as portsFile:

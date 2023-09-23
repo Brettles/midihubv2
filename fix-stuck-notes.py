@@ -31,11 +31,15 @@ def main():
 
     signal.signal(signal.SIGINT, interrupted)
 
-    configure()
+    logging.basicConfig()
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
 
     if alreadyRunning():
         logger.info('This is the second copy - stopping')
         sys.exit(0)
+
+    configure()
 
     portRanges = {'Low':range(0, 43), 'Mid':range(43, 86), 'High':range(86, 127), 'All':range(0, 127)}
 
@@ -49,9 +53,8 @@ def main():
         if 'messages' not in response: continue
 
         for message in response['messages']:
-            body = message['body']
-
-            print(f'Message body: {body}')
+            body = json.loads(message['body'])
+            print(body)
 
             resetRange = body['range']
             port = body['port']
@@ -74,14 +77,9 @@ def main():
                 sqs.delete_message(QueueUrl=sqsQueueUrl, ReceiptHandle=message['ReceiptHandle'])
             except Exception as e:
                 logger.error(f'SQS delete failed: {e}')
-                continue
 
 def configure():
     global logger, midiPorts, transmitPorts, sqsQueueUrl, tableName, alsaClients
-
-    logging.basicConfig()
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
 
     try:
         with open('midiports') as portsFile:
