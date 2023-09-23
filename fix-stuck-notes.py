@@ -21,13 +21,16 @@ transmitPorts = []
 tableName = None
 sqsQueueUrl = None
 logger = None
+alsaClients = {}
 
 def main():
-    global logger
+    global logger, sqsQueueUrl, transmitPorts, alsaClients
 
     signal.signal(signal.SIGINT, interrupted)
 
     configure()
+
+    portRanges = {'Low':range(0, 43), 'Mid':range(43, 86), 'High':range(86, 127), 'All':range(0, 127)}
 
     while True:
         try:
@@ -41,6 +44,23 @@ def main():
 
             print(f'Message body: {body}')
 
+            range = body['range']
+            port = body['port']
+
+            if port not in alsaClients:
+                logger.warning(f'Port {port} is not defined - skipping')
+            else:
+                if range not in portRanges:
+                    logger.warning(f'Range {range} not specified - using All')
+                    range = 'All'
+
+                logger.info(f'Sending NoteOff to {port} for {portRanges[range]}')
+
+                for midiNote in portRanges[range]:
+                    event = alsa_midi.NoteOffEvent(note=midiNote, velocity=64, channel=0)
+                    alsaClients[port].event_output(event)
+                alsaClients[port].drain_output()
+
             try:
                 sqs.delete_message(QueueUrl=sqsQueueUrl, ReceiptHandle=message['ReceiptHandle'])
             except Exception as e:
@@ -48,7 +68,7 @@ def main():
                 continue
 
 def configure():
-    global logger, midiPorts, transmitPorts, tableName
+    global logger, midiPorts, transmitPorts, tableName, alsaClients
 
     logging.basicConfig()
     logger = logging.getLogger()
@@ -103,6 +123,24 @@ def configure():
                           Item={'clientId':{'S':'TransmitPorts'},list:{'L':transmitPorts}})
     except Exception as e:
         logger.warning(f'Failed to save transmit ports to DynamoDB - continuing: {e}')
+
+    otherClients = client.list_ports(output=True)
+
+    for portNumber in transmitPorts:
+        client = alsa_midi.SequencerClient('fix-stuck-notes')
+        port = client.create_port('output', caps=alsa_midi.READ_PORT)
+
+        destinationClient = None
+        for item in otherClients:
+            if item.name.endswith(str(portNumber)):
+                destinationClient = item
+                break          
+
+        if destinationClient:
+            port.connect_to(destinationClient)
+        else:
+            logger.warning(f'Did not find destination for port {portNumber}')
+        alsaClients.append(client)
 
 def interrupted(signal, frame):
     global logger
