@@ -9,6 +9,7 @@ import sys
 import logging
 import boto3
 import sys
+import signal
 import alsa_midi
 
 logger = None
