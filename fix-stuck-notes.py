@@ -128,7 +128,7 @@ def configure():
 
     dynamodb = boto3.resource('dynamodb').Table(tableName)
     try:
-        dynamodb.put_item(Item={'clientId':'TransmitPorts','list'transmitPorts})
+        dynamodb.put_item(Item={'clientId':'TransmitPorts','list':transmitPorts})
     except Exception as e:
         logger.warning(f'Failed to save transmit ports to DynamoDB - continuing: {e}')
 
