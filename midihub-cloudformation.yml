@@ -45,6 +45,8 @@ Outputs:
     Value: !Sub ${APIGateway.ApiEndpoint}
   DynamoDBTableName:
     Value: !Ref DynamoDBTable
+  SQSQueueURL:
+    Value: !Ref SQSQueue
 
 Mappings:
   RegionMap:
@@ -126,7 +128,7 @@ Resources:
               content: !Sub | 
                 @reboot rm /home/ubuntu/output-*.log
                 * * * * * (cd /home/ubuntu/midihubv2/; ./midihub.py) >>/home/ubuntu/midihub-output.log 2>&1
-                * * * * * (cd /home/ubuntu/midihubv2/; ./fixstucknotes.py) >>/home/ubuntu/fixstuck-output.log 2>&1
+                * * * * * (cd /home/ubuntu/midihubv2/; ./fix-stuck-notes.py) >>/home/ubuntu/fixstuck-output.log 2>&1
                 * * * * * (cd /home/ubuntu; grep rtt *.log | ./midihubv2/update-latency.py)
               mode: '000644'
               owner: ubuntu
@@ -385,6 +387,8 @@ Resources:
                   for stat in page['Items']:
                       try:
                           clientId = stat['clientId']['S']
+                          if clientId == 'TransmitPorts': continue
+
                           hyphen = clientId.rfind('-')
                           if hyphen == -1:
                               name = clientId
@@ -441,6 +445,42 @@ Resources:
               if not sqsQueueURL:
                   logger.error('sqsQueueURL not set - stopping')
                   return {'statusCode':500, 'body':'sqsQueueURL not set'}
+          
+              return
+
+  LambdaGetTransmitPorts:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'midiHubv2-GetTransmitPorts-${AWS::StackName}'
+      Handler: index.lambda_handler
+      Runtime: python3.11
+      Architectures: [arm64]
+      Timeout: 20
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TableName: !Ref DynamoDBTable
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import logging
+          
+          dynamodb = boto3.client('dynamodb')
+          
+          tableName = os.environ.get('TableName')
+
+          logging.basicConfig()
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          
+          def lambda_handler(event, context):
+              global logger, tableName
+          
+              if not TableName:
+                  logger.error('TableName not set - stopping')
+                  return {'statusCode':500, 'body':'TableName not set'}
           
               return
 
@@ -513,6 +553,30 @@ Resources:
       FunctionName: !Ref LambdaResetStuckNote
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGateway}/*/*/resetStuckNote"
+
+  IntegrationGetTransmitPorts:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref APIGateway
+      IntegrationType: AWS_PROXY
+      IntegrationMethod: POST
+      PayloadFormatVersion: 2.0
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:midiHubv2-GetTransmitPorts-${AWS::StackName}/invocations"
+
+  ApiRouteGetTransmitPorts:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref APIGateway
+      RouteKey: "GET /getTransmitPorts"
+      Target: !Join ["/", ["integrations", !Ref "IntegrationGetTransmitPorts"]]
+
+  LambdaPermissionGetTransmitPorts:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Ref LambdaGetTransmitPorts
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGateway}/*/*/getTransmitPorts"
 
   GlobalAccelerator:
     Type: AWS::GlobalAccelerator::Accelerator

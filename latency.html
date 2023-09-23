@@ -33,7 +33,7 @@
     $('.latency').empty();
 
     $.get({
-     url: '--APIGATEWAYENDPOINT--'
+     url: '--APIGATEWAYENDPOINT--'+'/latency'
     }).then(function(data) {
      var div = '<table class="table table-striped table-borderless table-sm w-auto mx-auto mt-2">';
      div += '<thead><tr class="text-center"><th>Client</th><th>Hub Port</th><th>Last Updated Time</th><th>Average</th><th>Min</th><th>Max</th><th>Last</th></tr></thead>';
