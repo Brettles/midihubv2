@@ -147,7 +147,7 @@ def configure():
             port.connect_to(destinationClient)
         else:
             logger.warning(f'Did not find destination for port {portNumber}')
-        alsaClients.append(client)
+        alsaClients[portNumber] = client
 
 #
 # Although it's not completely harmful we don't really want more than one
