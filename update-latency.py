@@ -19,6 +19,7 @@ import boto3
 import datetime
 import sys
 import re
+from decimal import Decimal
 
 logger = None
 dynamodb = boto3.resource('dynamodb')
@@ -108,7 +109,7 @@ def main():
                     'lastLatency':str(latencyStats[id][-1]), 'lastLatencyTime':lastLatency[id],
                     'maxLatency':str(maxLatency[id][1]), 'maxLatencyTime':maxLatency[id][0],
                     'minLatency':str(minLatency[id][1]), 'minLatencyTime':minLatency[id][0],
-                    'averageLatency':str(average)}
+                    'averageLatency':Decimal(average)}
             batch.put_item(Item=item)
 
 if __name__ == "__main__":
