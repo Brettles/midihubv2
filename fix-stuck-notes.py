@@ -24,6 +24,7 @@ tableName = None
 sqsQueueUrl = None
 logger = None
 alsaClients = {}
+alsaPorts = {}
 
 def main():
     global logger, sqsQueueUrl, transmitPorts, alsaClients
@@ -136,20 +137,19 @@ def configure():
     clientList = checkClient.list_ports(output=True)
 
     for portNumber in transmitPorts:
-        client = alsa_midi.SequencerClient('fix-stuck-notes')
-        port = client.create_port('output', caps=alsa_midi.READ_PORT)
+        alsaClients[portNumber] = alsa_midi.SequencerClient('fix-stuck-notes')
+        alsaPorts[portNumber] = alsaClients[portNumber].create_port(f'fix-for-{portNumber}', caps=alsa_midi.READ_PORT)
 
         destinationClient = None
         for item in clientList:
             if item.name.endswith(str(portNumber)):
                 destinationClient = item
-                break          
+                break
 
         if destinationClient:
-            port.connect_to(destinationClient)
+            alsaPorts[portNumber].connect_to(destinationClient)
         else:
             logger.warning(f'Did not find destination for port {portNumber}')
-        alsaClients[portNumber] = client
 
 #
 # Although it's not completely harmful we don't really want more than one
