@@ -120,7 +120,7 @@ def configure():
     if not tableName:
         logger.error('Did not find DynamoDB table name')
         sys.exit(1)
-    if not SQSQueueURL:
+    if not sqsQueueUrl:
         logger.error('Did not find SQS queue URL')
         sys.exit(1)
 
