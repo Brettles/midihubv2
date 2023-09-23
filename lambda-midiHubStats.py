@@ -26,6 +26,8 @@ def lambda_handler(event, context):
         for stat in page['Items']:
             try:
                 clientId = stat['clientId']['S']
+                if clientId == 'TransmitPorts': continue
+
                 hyphen = clientId.rfind('-')
                 if hyphen == -1:
                     name = clientId
