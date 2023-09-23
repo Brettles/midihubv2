@@ -8,6 +8,7 @@
 import sys
 import logging
 import boto3
+import json
 import os
 import sys
 import signal
