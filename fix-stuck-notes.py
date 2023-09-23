@@ -50,19 +50,19 @@ def main():
 
             print(f'Message body: {body}')
 
-            range = body['range']
+            resetRange = body['range']
             port = body['port']
 
             if port not in alsaClients:
                 logger.warning(f'Port {port} is not defined - skipping')
             else:
-                if range not in portRanges:
-                    logger.warning(f'Range {range} not specified - using All')
-                    range = 'All'
+                if resetRange not in portRanges:
+                    logger.warning(f'Range {resetRange} not specified - using All')
+                    resetRange = 'All'
 
-                logger.info(f'Sending NoteOff to {port} for {portRanges[range]}')
+                logger.info(f'Sending NoteOff to {port} for {portRanges[resetRange]}')
 
-                for midiNote in portRanges[range]:
+                for midiNote in portRanges[resetRange]:
                     event = alsa_midi.NoteOffEvent(note=midiNote, velocity=64, channel=0)
                     alsaClients[port].event_output(event)
                 alsaClients[port].drain_output()
