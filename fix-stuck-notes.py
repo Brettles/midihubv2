@@ -45,7 +45,7 @@ def main():
             logger.error(f'SQS receive failed: {e}')
             continue
 
-        if messages not in response: continue
+        if 'messages' not in response: continue
 
         for message in response['messages']:
             body = message['body']
