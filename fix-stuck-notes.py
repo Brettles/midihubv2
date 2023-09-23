@@ -8,6 +8,7 @@
 import sys
 import logging
 import boto3
+import os
 import sys
 import signal
 import alsa_midi
@@ -29,6 +30,10 @@ def main():
     signal.signal(signal.SIGINT, interrupted)
 
     configure()
+
+    if alreadyRunning():
+        logger.info('This is the second copy - stopping')
+        sys.exit(0)
 
     portRanges = {'Low':range(0, 43), 'Mid':range(43, 86), 'High':range(86, 127), 'All':range(0, 127)}
 
@@ -141,6 +146,23 @@ def configure():
         else:
             logger.warning(f'Did not find destination for port {portNumber}')
         alsaClients.append(client)
+
+#
+# Although it's not completely harmful we don't really want more than one
+# copy of this running at any one time. The worst that can happen is that
+# two copies of this script will compete for SQS messages. Best that this
+# doesn't happen.
+#
+def alreadyRunning():
+    global logger
+
+    myName = os.path.basename(sys.argv[0])
+
+    logger.debug('Checking to see if we are already running')
+    output = os.popen('/usr/bin/ps -e').read()
+    if output.count(myName) > 1: return True
+
+    return False
 
 def interrupted(signal, frame):
     global logger
