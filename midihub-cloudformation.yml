@@ -125,7 +125,8 @@ Resources:
             "/home/ubuntu/crontab.ubuntu":
               content: !Sub | 
                 @reboot rm /home/ubuntu/output-*.log
-                * * * * * (cd /home/ubuntu/midihubv2/; ./midihub.py) >>/home/ubuntu/output.log 2>&1
+                * * * * * (cd /home/ubuntu/midihubv2/; ./midihub.py) >>/home/ubuntu/midihub-output.log 2>&1
+                * * * * * (cd /home/ubuntu/midihubv2/; ./fixstucknotes.py) >>/home/ubuntu/fixstuck-output.log 2>&1
                 * * * * * (cd /home/ubuntu; grep rtt *.log | ./midihubv2/update-latency.py)
               mode: '000644'
               owner: ubuntu
@@ -225,8 +226,8 @@ Resources:
           Statement:
           - Effect: Allow
             Action:
-            -  cloudfront:GetDistributionConfig
-            -  cloudfront:UpdateDistribution
+            - cloudfront:GetDistributionConfig
+            - cloudfront:UpdateDistribution
             Resource: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
       - PolicyName: CloudFrontOAC
         PolicyDocument:
@@ -241,9 +242,18 @@ Resources:
           Statement:
           - Effect: Allow
             Action:
-            -  s3:CreateBucket
-            -  s3:PutBucketPolicy
-            -  s3:PutObject
+            - s3:CreateBucket
+            - s3:PutBucketPolicy
+            - s3:PutObject
+            Resource: '*'
+      - PolicyName: SQS
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - sqs:ReceiveMessage
+            - sqs: DeleteMessage
             Resource: '*'
 
   InstanceProfile:
@@ -269,6 +279,27 @@ Resources:
         Enabled: True
         AttributeName: expiryTime
 
+  SQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'midihubv2-${AWS::StackName}'
+      ReceiveMessageWaitTimeSeconds: 1
+
+  SQSQueuePolicy:
+    Type: QWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+      - !Ref SQSQueue
+      PolicyDocument:
+      - Effect: Allow
+        Action:
+        - sqs:SendMessage
+        - sqs:ReceiveMessage
+        - sqs:DeleteMessage
+        Resource: !GetAtt SQSQueue.Arn
+        Principal: 
+        - ${AWS::AccountId}
+
   LambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -282,7 +313,7 @@ Resources:
             Action:
             - sts:AssumeRole
       ManagedPolicyArns:
-        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -291,20 +322,24 @@ Resources:
               - lambda.amazonaws.com
             Action:
             - sts:AssumeRole
-
-  DynamoDBPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: DynamoDB
-      PolicyDocument:
-        Statement:
+      Policies:
+      - PolicyName: SQS
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
           - Effect: Allow
-            Resource: !GetAtt DynamoDBTable.Arn
             Action:
-            - dynamodb:Scan
-            - dynamodb:GetItem
-      Roles:
-        - !Ref LambdaRole
+            - sqs:SendMessage
+            Resource: !GetAtt SQSQueue.Arn
+      - PolicyName: DynamoDB
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Resource: !GetAtt DynamoDBTable.Arn
+              Action:
+              - dynamodb:Scan
+              - dynamodb:GetItem
 
   LambdaGetLatencyStats:
     Type: AWS::Lambda::Function
@@ -371,6 +406,42 @@ Resources:
 
               return(output)
 
+  LambdaResetStuckNote:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'midiHubv2-ResetStuckNote-${AWS::StackName}'
+      Handler: index.lambda_handler
+      Runtime: python3.11
+      Architectures: [arm64]
+      Timeout: 20
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          SQSQueueURL: !Ref SQSQueue
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import logging
+          
+          sqs = boto3.client('sqs')
+          
+          sqsQueueURL = os.environ.get('SQSQueueURL')
+
+          logging.basicConfig()
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          
+          def lambda_handler(event, context):
+              global logger, tableName
+          
+              if not sqsQueueURL:
+                  logger.error('sqsQueueURL not set - stopping')
+                  return {'statusCode':500, 'body':'sqsQueueURL not set'}
+          
+              return
+
   APIGateway:
     Type: AWS::ApiGatewayV2::Api
     Properties:
@@ -416,6 +487,30 @@ Resources:
       FunctionName: !Ref LambdaGetLatencyStats
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGateway}/*/*/latency"
+
+  IntegrationResetStuckNote:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref APIGateway
+      IntegrationType: AWS_PROXY
+      IntegrationMethod: POST
+      PayloadFormatVersion: 2.0
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:midiHubv2-ResetStuckNote-${AWS::StackName}/invocations"
+
+  ApiRouteResetStuckNote:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref APIGateway
+      RouteKey: "GET /resetStuckNote"
+      Target: !Join ["/", ["integrations", !Ref "IntegrationResetStuckNote"]]
+
+  LambdaPermissionResetStuckNote:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !Ref LambdaResetStuckNote
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGateway}/*/*/resetStuckNote"
 
   GlobalAccelerator:
     Type: AWS::GlobalAccelerator::Accelerator
