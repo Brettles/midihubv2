@@ -45,6 +45,8 @@ def main():
             logger.error(f'SQS receive failed: {e}')
             continue
 
+        if messages not in response: continue
+
         for message in response['messages']:
             body = message['body']
 
@@ -126,7 +128,7 @@ def configure():
 
     dynamodb = boto3.resource('dynamodb').Table(tableName)
     try:
-        dynamodb.put_item(Item={'clientId':{'S':'TransmitPorts'},'list':{'L':transmitPorts}})
+        dynamodb.put_item(Item={'clientId':'TransmitPorts','list'transmitPorts})
     except Exception as e:
         logger.warning(f'Failed to save transmit ports to DynamoDB - continuing: {e}')
 
