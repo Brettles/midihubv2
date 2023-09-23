@@ -12,7 +12,6 @@ import sys
 import alsa_midi
 
 logger = None
-dynamodb = boto3.client('dynamodb')
 sqs = boto3.client('sqs')
 cfn = boto3.client('cloudformation')
 
@@ -118,9 +117,9 @@ def configure():
         logger.error('Did not find SQS queue URL')
         sys.exit(1)
 
+    dynamodb = boto3.resource('dynamodb').Table(tableName)
     try:
-        dynamodb.put_item(TableName=tableName,
-                          Item={'clientId':{'S':'TransmitPorts'},list:{'L':transmitPorts}})
+        dynamodb.put_item(Item={'clientId':{'S':'TransmitPorts'},'list':{'L':transmitPorts}})
     except Exception as e:
         logger.warning(f'Failed to save transmit ports to DynamoDB - continuing: {e}')
 

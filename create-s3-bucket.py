@@ -22,19 +22,22 @@ import boto3
 import botocore.exceptions
 
 logger = None
+apiGatewayEndpoint = ''
+
 randomSource = string.ascii_lowercase+string.digits
+randomName = 'midihubv2-'+''.join(random.choice(randomSource) for i in range(16))
 
 random.seed()
 
 def main():
-    global logger
+    global logger, apiGatewayEndpoint, randomName
 
     logging.basicConfig()
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
     randomName = 'midihubv2-'+''.join(random.choice(randomSource) for i in range(16))
-    logger.info(f'Random name: {randomName}')
+    logger.info(f'Random bucket name: {randomName}')
 
     try:
         with open('../cloudformationstackname') as cfnfile:
@@ -78,7 +81,6 @@ def main():
         logger.error(f'Cannot get stack information: {e}')
         return
 
-    apiGatewayEndpoint = ''
     cloudFrontDistribution = ''
     for output in response['Stacks'][0]['Outputs']:
         if output['OutputKey'] == 'APIGatewayEndpoint': apiGatewayEndpoint = output['OutputValue']
@@ -90,17 +92,6 @@ def main():
     if not cloudFrontDistribution:
         logger.error('Did not find CloudFront dstribution in CloudFormation outputs')
         return
-
-    try:
-        with open('latency.html') as webfile:
-            originalLatencyHTML = webfile.read().strip()
-    except FileNotFoundError:
-        logger.error('Cannot read HTML latency source - stopping')
-        return
-    except Exception as e:
-        logger.error(f'Cannot read HTML latency source file: {e}')
-
-    newLatencyHTML = originalLatencyHTML.replace('--APIGATEWAYENDPOINT--', apiGatewayEndpoint+'/latency')
 
     try:
         config = cloudfront.get_distribution_config(Id=cloudFrontDistribution)
@@ -166,13 +157,31 @@ def main():
         logger.error(f'Failed to update CloudFront origins: {e}')
         return
 
-    try:
-        response = s3.put_object(Bucket=randomName, Key='latency.html', Body=newLatencyHTML, ContentType='text/html')
-    except Exception as e:
-        logger.error(f'Failed to upload latency HTML to S3: {e}')
-        return
+    copyFileToS3('latency.html')
+    copyFileToS3('fixstucknotes.html')
 
     logger.info(f'Created S3 bucket {randomName} and updated origin {config["ETag"]}')
+
+def copyFileToS3(filename):
+    global logger, apiGatewayEndpoint
+
+    try:
+        with open(filename) as webfile:
+            originalHtml = webfile.read().strip()
+    except FileNotFoundError:
+        logger.error(f'Cannot read source file {filename} - skipping')
+        return
+    except Exception as e:
+        logger.error(f'Error reading source file {filename}: {e}')
+        return
+
+    newHtml = originalHtml.replace('--APIGATEWAYENDPOINT--', apiGatewayEndpoint)
+
+    try:
+        response = s3.put_object(Bucket=randomName, Key=filename, Body=newLatencyHTML, ContentType='text/html')
+    except Exception as e:
+        logger.error(f'Failed to upload {filename} to S3: {e}')
+        return
 
 if __name__ == "__main__":
     main()

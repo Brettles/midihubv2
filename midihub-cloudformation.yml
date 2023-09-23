@@ -257,7 +257,7 @@ Resources:
           - Effect: Allow
             Action:
             - sqs:ReceiveMessage
-            - sqs: DeleteMessage
+            - sqs:DeleteMessage
             Resource: '*'
 
   InstanceProfile:
@@ -287,22 +287,23 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub 'midihubv2-${AWS::StackName}'
-      ReceiveMessageWaitTimeSeconds: 1
+      ReceiveMessageWaitTimeSeconds: 5
 
   SQSQueuePolicy:
-    Type: QWS::SQS::QueuePolicy
+    Type: AWS::SQS::QueuePolicy
     Properties:
       Queues:
       - !Ref SQSQueue
-      PolicyDocument:
-      - Effect: Allow
-        Action:
-        - sqs:SendMessage
-        - sqs:ReceiveMessage
-        - sqs:DeleteMessage
-        Resource: !GetAtt SQSQueue.Arn
-        Principal: 
-        - ${AWS::AccountId}
+      PolicyDocument: 
+        Statement: 
+        - Effect: Allow
+          Action:
+          - sqs:SendMessage
+          - sqs:ReceiveMessage
+          - sqs:DeleteMessage
+          Resource: !GetAtt SQSQueue.Arn
+          Principal:
+            AWS: !Sub ${AWS::AccountId}
 
   LambdaRole:
     Type: AWS::IAM::Role
@@ -466,23 +467,28 @@ Resources:
           import boto3
           import os
           import logging
-          
-          dynamodb = boto3.client('dynamodb')
-          
-          tableName = os.environ.get('TableName')
+
+          tableName = os.environ.get('TableName', '')
+          dynamodb = boto3.resource('dynamodb').Table(tableName)
 
           logging.basicConfig()
           logger = logging.getLogger()
           logger.setLevel(logging.INFO)
-          
+
           def lambda_handler(event, context):
               global logger, tableName
-          
-              if not TableName:
+
+              if not tableName:
                   logger.error('TableName not set - stopping')
                   return {'statusCode':500, 'body':'TableName not set'}
-          
-              return
+
+              response = dynamodb.get_item(Key={'clientId':'TransmitPorts'}).get('Item')
+              if not response:
+                  logger.error('TransmitPorts not found - stopping')
+                  return {'statusCode':500, 'body':'TransmitPorts not found'}
+
+              transmitPorts = response.get('list', [])
+              return(transmitPorts)
 
   APIGateway:
     Type: AWS::ApiGatewayV2::Api

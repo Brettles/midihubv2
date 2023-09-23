@@ -120,7 +120,7 @@ def checkDaemon():
 # suitable for our purposes here.
 #
 def checkMidiParticipants():
-    global logger,connectInAndOut
+    global logger, connectInAndOut
 
     logger.debug('Getting output from aconnect')
 
