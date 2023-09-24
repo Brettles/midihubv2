@@ -45,7 +45,7 @@ def main():
 
     while True:
         try:
-            response = sqs.receive_message(QueueUrl=sqsQueueUrl, WaitTimeSeconds=10)
+            response = sqs.receive_message(QueueUrl=sqsQueueUrl, WaitTimeSeconds=10, MaxNumberOfMessages=1)
         except Exception as e:
             logger.error(f'SQS receive failed: {e}')
             continue
@@ -158,7 +158,7 @@ def configure():
 def alreadyRunning():
     global logger
 
-    myName = os.path.basename(sys.argv[0])
+    myName = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 
     logger.debug('Checking to see if we are already running')
     output = os.popen('/usr/bin/ps -e').read()
