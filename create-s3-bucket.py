@@ -29,6 +29,10 @@ randomName = 'midihubv2-'+''.join(random.choice(randomSource) for i in range(16)
 
 random.seed()
 
+cfn = boto3.client('cloudformation', region_name=regionName)
+cloudfront = boto3.client('cloudfront', region_name=regionName)
+s3 = boto3.client('s3', region_name=regionName)
+
 def main():
     global logger, apiGatewayEndpoint, randomName
 
@@ -70,10 +74,6 @@ def main():
     if not accountId:
         logger.warning('No account id in instance metadata')
         return
-
-    cfn = boto3.client('cloudformation', region_name=regionName)
-    cloudfront = boto3.client('cloudfront', region_name=regionName)
-    s3 = boto3.client('s3', region_name=regionName)
 
     try:
         response = cfn.describe_stacks(StackName=stackName)
