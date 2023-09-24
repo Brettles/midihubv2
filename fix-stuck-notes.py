@@ -52,12 +52,12 @@ def main():
 
         if 'messages' not in response: continue
 
-        for message in response['messages']:
-            body = json.loads(message['body'])
+        for message in response['Messages']:
+            body = json.loads(message['Body'])
             print(body)
 
             resetRange = body['range']
-            port = body['port']
+            port = int(body['port'])
 
             if port not in alsaClients:
                 logger.warning(f'Port {port} is not defined - skipping')
