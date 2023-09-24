@@ -40,7 +40,7 @@ Outputs:
     Value: !Ref CloudFrontDistribution
   LatencyStatisticsPage:
     Value: !Sub 'https://${CloudFrontDistribution.DomainName}/latency.html'
-  ResetStuckNotesPage::
+  ResetStuckNotesPage:
     Value: !Sub 'https://${CloudFrontDistribution.DomainName}/fixstucknotes.html'
   APIGatewayEndpoint:
     Description: Substitute into latency.html
