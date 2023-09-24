@@ -29,7 +29,7 @@
 
    function fixStuckNotes(port, range) {
     $.get({
-     url: 'https://2ztr23hlze.execute-api.ap-southeast-2.amazonaws.com'+'/resetStuckNote?port='+port+'&range='+range
+     url: '--APIGATEWAYENDPOINT--'+'/resetStuckNote?port='+port+'&range='+range
     }).then(function(data) {
      $('.tick-'+port+'-'+range.toLowerCase()).show();
      setTimeout(() => { $('.tick-'+port+'-'+range.toLowerCase()).hide(); }, 2000);
