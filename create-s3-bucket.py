@@ -178,7 +178,7 @@ def copyFileToS3(s3, filename):
     newHtml = originalHtml.replace('--APIGATEWAYENDPOINT--', apiGatewayEndpoint)
 
     try:
-        response = s3.put_object(Bucket=randomName, Key=filename, Body=newLatencyHTML, ContentType='text/html')
+        response = s3.put_object(Bucket=randomName, Key=filename, Body=newHTML, ContentType='text/html')
     except Exception as e:
         logger.error(f'Failed to upload {filename} to S3: {e}')
         return
