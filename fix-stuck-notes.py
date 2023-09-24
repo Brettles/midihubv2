@@ -45,14 +45,12 @@ def main():
 
     while True:
         try:
-            response = sqs.receive_message(QueueUrl=sqsQueueUrl, WaitTimeSeconds=10, MaxNumberOfMessages=1)
+            messageList = sqs.receive_message(QueueUrl=sqsQueueUrl, WaitTimeSeconds=10, MaxNumberOfMessages=1).get('Messages', [])
         except Exception as e:
             logger.error(f'SQS receive failed: {e}')
             continue
 
-        if 'Messages' not in response: continue
-
-        for message in response['Messages']:
+        for message in messageList:
             body = json.loads(message['Body'])
             print(body)
 
