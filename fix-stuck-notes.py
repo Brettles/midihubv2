@@ -50,7 +50,7 @@ def main():
             logger.error(f'SQS receive failed: {e}')
             continue
 
-        if 'messages' not in response: continue
+        if 'Messages' not in response: continue
 
         for message in response['Messages']:
             body = json.loads(message['Body'])
