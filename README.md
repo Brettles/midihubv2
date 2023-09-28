@@ -19,7 +19,11 @@ In this repo this is what you get:
  - midihub.py - Python script that launches `rtpmidi` and when the listeners are running it joins them together in a specific way - more details below.
  - midihub-cloudformation.yml - [AWS CloudFormation](https://aws.amazon.com/cloudformation/) template for building an appropriate Linux instance and deploying into AWS. More details on that below.
  - lambda-midiHubStats.py - Code for a Lambda function which are automatically deployed by the CloudFormation template to respond to request when asked for latency information. If you're not deploying this using CloudFormation you can use this code to query the database.
- - latency.html - Source HTML files for a (very simple!) web front end to call the two Lambda functions via API Gateway. Feel free to modify these or embed the code into your own web page. Designed to show who is connected and what their round-trip latency is. These are modified during setup with the appropriate API Gateway endpoint.
+ - latency.html - Source HTML file for a (very simple!) web front end to calls Lambda latency function via API Gateway. Feel free to modify these or embed the code into your own web page. Designed to show who is connected and what their round-trip latency is. These are modified during setup with the appropriate API Gateway endpoint.
+ - lambda-getTransmitPorts.py - Code for a Lambda function that retrieves the "transmit" MIDI ports from DynamoDB and sends them back to the caller.
+ - lambda-resetStuckNote.py - Receives calls from the HTML file below and sends requests to a SQS queue to reset "stuck" notes.
+ - fixstucknotes.html - Source HTML file for (another simple) web front end that first determines the ports in use and second can call the other Lambda function to send MIDI messages to reset "stuck" notes in the MIDI stream.
+ - fix-stuck-notes.py - This runs on the instance and receives SQS messages from the Lambda function above. When it receives a port number and note "range" it sends NoteOff messages to the port to clear any "stuck" notes.
  - update-latency.py - A script that runs on the instance. It trawls the log files from `rtpmidi` and sends the contents to a DynamoDB database. Scheduled to run via cron once every minute.
  - create-s3-bucket.py - After the instance has been created this runs to create a S3 bucket with a unique name; link the CloudFront distirbution to it; set up secure access (the S3 bucket is not public; only CloudFront can access it); and uploads the HTML file after modifying it with the API Gateway endpoint URL. Note that if you are not deploying in the `us-east-1` region it make take some time (hours) for the CloudFront/S3 pair to work correctly.
 
@@ -46,8 +50,9 @@ The template creates:
  - a Global Acceelerator linked to the Elastic IP
  - a dummy CloudFront distribution that gets modified by the `create-s3-bucket.py` script
  - an API Gateway
- - a Lambda functions
+ - three Lambda functionss
  - a DynamoDB database
+ - a SQS queue
  - and a bunch of glue to hold all of these things together.
 
 Deployment takes around ten minutes - there are a bunch of packages to install. Note that when the CloudFormation service says that deployment is complete, you will need to wait for the rest of the tasks on the instance (such as the compilation) to complete.
@@ -66,8 +71,10 @@ Outputs from the CloudFormation template of interest are:
 
  - The Elastic IP that you should use to connect to midiHub.
  - The two IP addresses for Global Accelerator (more on that below).
- - A CloudFront URL which will show recent latency statistics from clients that have connected to midiHub.
- - The API Gateway URL for retrieiving latency statistics. This is generally not required (as the web page is built automatically) but you might need it if you were going to display the statistics using some other tool that you can build yourself.
+ - The API Gateway base URL. On that endpoint you'll find /latency, /getTransmitPorts and /resetStuckNote. Examples of how to use these are in the HTML files.
+ - The two CloudFront-hosted HTML URLs (latency.html and fixstucknotes.html).
+ - SQS Queue URL which is used by other code in the system.
+ - DynamoDB table name which is used by other code in the system.
 
 The Elastic IP may result in charges to your account. If you are shutting down the MidiHub instance to save costs (this is a good idea!) you will be charged for the Elastic IP because it is unused. On [the pricing page](https://aws.amazon.com/ec2/pricing/on-demand/#Elastic_IP_Addresses) you can see that this will result in an extra charge of around US$4 per month. You can delete the entire CloudFormation stack (which will eliminate the charge) but the next time you create the stack it will have a new Elastic IP.
 
@@ -121,8 +128,11 @@ You might want to run this on your own (non-AWS) virtual machine. In AWS this ru
 
 You'll need the following packages installed:
 
-- alsa-base
-- linux-modules-6.2.0-1009-lowlatency - one of the prerequisites is the dummy sound card; it is this package in Ubuntu which installs it
+ - alsa-base
+ - avahi-utils
+ - linux-modules-6.2.0-1013-lowlatency - one of the prerequisites is the dummy sound card; it is this package in Ubuntu which installs it
+ - python3
+ - boto3 and alsa-midi (use pip3 to install)
 
 Install the Python `boto3` library (`sudo pip3 install boto3`) - this is used in AWS to determine which region the software is running in; outside of AWS it doesn't matter but it is included so installing boto3 will avoid any errors.
 
