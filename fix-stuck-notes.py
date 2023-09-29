@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import signal
+import time
 import alsa_midi
 
 logger = None
@@ -26,8 +27,10 @@ logger = None
 alsaClients = {}
 alsaPorts = {}
 
+portRanges = {'Low':range(0, 43), 'Mid':range(43, 86), 'High':range(86, 127), 'All':range(0, 127)}
+
 def main():
-    global logger, sqsQueueUrl, transmitPorts, alsaClients
+    global logger, sqsQueueUrl, transmitPorts, alsaClients, portRanges
 
     signal.signal(signal.SIGINT, interrupted)
 
@@ -39,9 +42,14 @@ def main():
         logger.info('This is the second copy - stopping')
         sys.exit(0)
 
-    configure()
+    #
+    # We should wait for the other processes to start before we attach to the
+    # MIDI channels. It doesn't appear to be an issue but it's a little more
+    # "polite".
+    #
+    time.sleep(5)
 
-    portRanges = {'Low':range(0, 43), 'Mid':range(43, 86), 'High':range(86, 127), 'All':range(0, 127)}
+    configure()
 
     while True:
         try:
