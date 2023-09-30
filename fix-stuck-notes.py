@@ -60,7 +60,6 @@ def main():
 
         for message in messageList:
             body = json.loads(message['Body'])
-            print(body)
 
             resetRange = body['range']
             port = int(body['port'])
