@@ -129,7 +129,7 @@ def checkMidiParticipants():
     logger.debug('Getting output from aconnect')
 
     try:
-        output = os.popen('aconnect -l').read().split('\n')
+        output = os.popen('aconnect -l').read().splitlines()
     except Exception as e:
         logger.error(f'Failed to get aconnect output: {e}')
         return
