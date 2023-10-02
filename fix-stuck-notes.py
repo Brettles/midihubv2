@@ -141,7 +141,7 @@ def configure():
 
     for portNumber in transmitPorts:
         alsaClients[portNumber] = alsa_midi.SequencerClient('fix-stuck-notes')
-        alsaPorts[portNumber] = alsaClients[portNumber].create_port(f'fix-for-{portNumber}', caps=alsa_midi.READ_PORT)
+        alsaPorts[portNumber] = alsaClients[portNumber].create_port(f'fix-for-{portNumber}')
 
         destinationClient = None
         for item in clientList:
