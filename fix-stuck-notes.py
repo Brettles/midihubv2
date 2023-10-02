@@ -15,7 +15,6 @@ import signal
 import time
 import alsa_midi
 
-logger = None
 sqs = boto3.client('sqs')
 cfn = boto3.client('cloudformation')
 
