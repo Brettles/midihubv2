@@ -51,7 +51,7 @@ def main():
     logger.setLevel(logging.INFO)
 
     if alreadyRunning():
-        logger.info('This is the second copy - stopping')
+        logger.debug('This is the second copy - stopping')
         sys.exit(0)
 
     configure('', '')
