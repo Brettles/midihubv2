@@ -137,7 +137,7 @@ def configure():
         logger.warning(f'Failed to save transmit ports to DynamoDB - continuing: {e}')
 
     checkClient = alsa_midi.SequencerClient('checker')
-    clientList = checkClient.list_ports(output=True)
+    clientList = checkClient.list_ports()
 
     for portNumber in transmitPorts:
         alsaClients[portNumber] = alsa_midi.SequencerClient('fix-stuck-notes')
