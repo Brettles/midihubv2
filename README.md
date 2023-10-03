@@ -26,6 +26,7 @@ In this repo this is what you get:
  - fix-stuck-notes.py - This runs on the instance and receives SQS messages from the Lambda function above. When it receives a port number and note "range" it sends NoteOff messages to the port to clear any "stuck" notes.
  - update-latency.py - A script that runs on the instance. It trawls the log files from `rtpmidi` and sends the contents to a DynamoDB database. Scheduled to run via cron once every minute.
  - create-s3-bucket.py - After the instance has been created this runs to create a S3 bucket with a unique name; link the CloudFront distirbution to it; set up secure access (the S3 bucket is not public; only CloudFront can access it); and uploads the HTML file after modifying it with the API Gateway endpoint URL. Note that if you are not deploying in the `us-east-1` region it make take some time (hours) for the CloudFront/S3 pair to work correctly.
+ - midi-monitor.py - A troubleshooting tool to see what is being received on specific also ports. Find the name of the existing ports by running `aconnect -l` then use the port name (e.g. 'midiHub-GroupOne-5040') as a parameter to this utility. It will display notes currently playing the the MIDI channels they are playing on. Press ^C to exit.
 
 The intention is that you can run this solution when you need it and shut it down when you don't. To shut the solution down, you can go into the [EC2 console](https://console.aws.amazon.com/ec2/), select the instance labelled `midiHubv2` then choose "Instance state" (top-right of the browser window) and click "Stop instance". You'll notice there is a "Start instance" choice there too - that's how you can restart the virtual machine running MidiHub.
 
@@ -49,8 +50,8 @@ The template creates:
  - an Elastic IP
  - a Global Acceelerator linked to the Elastic IP
  - a dummy CloudFront distribution that gets modified by the `create-s3-bucket.py` script
- - an API Gateway
- - three Lambda functionss
+ - an API Gateway with three routes to...
+ - ...three Lambda functionss
  - a DynamoDB database
  - a SQS queue
  - and a bunch of glue to hold all of these things together.
