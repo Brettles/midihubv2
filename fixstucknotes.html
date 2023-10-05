@@ -43,7 +43,7 @@
 
    function getTransmitPorts() {
     $.get({
-     url: 'https://2ztr23hlze.execute-api.ap-southeast-2.amazonaws.com'+'/getTransmitPorts'
+     url: '--APIGATEWAYENDPOINT--'+'/getTransmitPorts'
     }).then(function(data) {
      var table = '<table class="table table-striped table-borderless table-sm w-auto mx-auto mt-2">';
      table += '<tr><th>Transmit Port</th><th class="text-center" colspan="4">Range</th></tr>';
