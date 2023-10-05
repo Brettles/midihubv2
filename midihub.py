@@ -141,14 +141,14 @@ def checkMidiParticipants():
             try:
                 clientNumber = re.findall(r'\d+', line)[0]
             except:
-                logger.warning(f'  Did not see client id in {line} - skipping')
+                logger.info(f'  Did not see client id in {line} - skipping')
                 continue
             if int(clientNumber) < 128: continue
 
             try:
                 nameList = re.findall(r"midiHub-.+'", line)[0][:-1].split('-')
             except:
-                logger.warning(f'  Did not see midiHub name in {line} - skipping')
+                logger.info(f'  Did not see midiHub name in {line} - skipping')
                 continue
 
             if nameList[1] not in groupPorts: groupPorts[nameList[1]] = []
