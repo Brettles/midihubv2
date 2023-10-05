@@ -220,7 +220,7 @@ def checkPrerequisites():
 # This is also called if we're sent SIGHUP mainly so that we can re-read the
 # ports configuration file.
 #
-def configure(singal, frame):
+def configure(signal, frame):
     global logger, location, midiPorts, connectInAndOut
 
     try:
