@@ -157,11 +157,13 @@ Resources:
           /usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource MidiHubInstance --region ${AWS::Region}
           /usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MidiHubInstance --region ${AWS::Region}
           apt-get install alsa-base avahi-utils linux-modules-6.2.0-1013-lowlatency -y
-          pip3 install boto3 alsa-midi
+          pip3 install boto3 alsa-midi construct
           cd /home/ubuntu
           git clone https://github.com/Brettles/midihubv2
+          git clone https://github.com/Brettles/pymidi
           cd midihubv2
-          chmod +x midihub.py update-latency.py create-s3-bucket.py
+          chmod +x midihub.py update-latency.py create-s3-bucket.py fix-stuck-notes.py alsaserver.py
+          cp alsaserver.py ../pymidi
           ./create-s3-bucket.py
           cd /home/ubuntu
           chown -R ubuntu:ubuntu *

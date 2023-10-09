@@ -12,7 +12,6 @@ import json
 import os
 import sys
 import signal
-import time
 import alsa_midi
 
 sqs = boto3.client('sqs')
@@ -41,18 +40,13 @@ def main():
         logger.debug('This is the second copy - stopping')
         sys.exit(0)
 
-    #
-    # We should wait for the other processes to start before we attach to the
-    # MIDI channels. It doesn't appear to be an issue but it's a little more
-    # "polite".
-    #
-    time.sleep(5)
-
     configure()
 
     while True:
+        connectMidiPorts()
+
         try:
-            messageList = sqs.receive_message(QueueUrl=sqsQueueUrl, WaitTimeSeconds=10, MaxNumberOfMessages=1).get('Messages', [])
+            messageList = sqs.receive_message(QueueUrl=sqsQueueUrl, WaitTimeSeconds=2, MaxNumberOfMessages=1).get('Messages', [])
         except Exception as e:
             logger.error(f'SQS receive failed: {e}')
             continue
@@ -74,14 +68,44 @@ def main():
 
                 for midiNote in portRanges[resetRange]:
                     for chan in range(0, 16):
-                      event = alsa_midi.NoteOffEvent(note=midiNote, velocity=64, channel=chan)
-                      alsaClients[port].event_output(event)
-                alsaClients[port].drain_output()
+                        event = alsa_midi.NoteOffEvent(note=midiNote, velocity=64, channel=chan)
+                        alsaClients[port].event_output(event)
+                        if not chan%8: alsaClients[port].drain_output()
+                    alsaClients[port].drain_output()
 
             try:
                 sqs.delete_message(QueueUrl=sqsQueueUrl, ReceiptHandle=message['ReceiptHandle'])
             except Exception as e:
                 logger.error(f'SQS delete failed: {e}')
+
+#
+# This used to be done in configure() (at startup) but if the network MIDI
+# components die # and restart we need to reconenct to the appropriate ports
+# ourselves while # we re running.
+#
+def connectMidiPorts():
+    global alsaClients, transmitPorts
+
+    checkClient = alsa_midi.SequencerClient('checker')
+    clientList = checkClient.list_ports()
+
+    for portNumber in transmitPorts:
+        if portNumber not in alsaClients: # Initial setup of MIDI clients
+            alsaClients[portNumber] = alsa_midi.SequencerClient('fix-stuck-notes')
+            alsaPorts[portNumber] = alsaClients[portNumber].create_port(f'fix-for-{portNumber}')
+
+        if alsaPorts[portNumber].list_subscribers(): continue # We're already connected
+
+        destinationClient = None
+        for item in clientList:
+            if item.name.endswith(str(portNumber)):
+                destinationClient = item
+                break
+
+        if destinationClient:
+            alsaPorts[portNumber].connect_to(destinationClient)
+        else:
+            logger.warning(f'Did not find destination for port {portNumber}')
 
 def configure():
     global logger, midiPorts, transmitPorts, sqsQueueUrl, tableName, alsaClients
@@ -135,24 +159,6 @@ def configure():
         dynamodb.put_item(Item={'clientId':'TransmitPorts','list':transmitPorts})
     except Exception as e:
         logger.warning(f'Failed to save transmit ports to DynamoDB - continuing: {e}')
-
-    checkClient = alsa_midi.SequencerClient('checker')
-    clientList = checkClient.list_ports()
-
-    for portNumber in transmitPorts:
-        alsaClients[portNumber] = alsa_midi.SequencerClient('fix-stuck-notes')
-        alsaPorts[portNumber] = alsaClients[portNumber].create_port(f'fix-for-{portNumber}')
-
-        destinationClient = None
-        for item in clientList:
-            if item.name.endswith(str(portNumber)):
-                destinationClient = item
-                break
-
-        if destinationClient:
-            alsaPorts[portNumber].connect_to(destinationClient)
-        else:
-            logger.warning(f'Did not find destination for port {portNumber}')
 
 #
 # Although it's not completely harmful we don't really want more than one
