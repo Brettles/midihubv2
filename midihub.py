@@ -6,10 +6,10 @@ import logging
 import signal
 import time
 import subprocess
-import re
 import boto3
 import requests
 import json
+import alsa_midi
 
 #
 # Configuration:
@@ -27,8 +27,9 @@ import json
 #      directory called "midiports". Put a comma-seperate list of ports into
 #      the file and it will be read during startup or if SIGHUP is sent.
 #
-SLEEP_CHECK_INTERVAL = 5
-MIDI_DAEMON = '/opt/rtpmidi_1.1.2-ubuntu22.04/bin/rtpmidi'
+SLEEP_CHECK_INTERVAL = 3
+MIDI_INPUT_DAEMON = '/home/ubuntu/pymidi/alsaserver.py'
+MIDI_OUTPUT_DAEMON = '/opt/rtpmidi_1.1.2-ubuntu22.04/bin/rtpmidi'
 
 midiPorts = {'GroupOne': [5040, 5042], 'GroupTwo': [5050, 5052]}
 logger = None
@@ -75,12 +76,13 @@ def checkDaemon():
     global logger, midiPorts
 
     midiStatus = {}
-    daemonName = os.path.basename(MIDI_DAEMON)
+    inputDaemonName = os.path.basename(MIDI_INPUT_DAEMON)
+    outputDaemonName = os.path.basename(MIDI_OUTPUT_DAEMON)
 
     stream = os.popen('/usr/bin/ps -ef')
     psLine = stream.readline()
     while psLine:
-        if psLine.find(daemonName) > -1:
+        if psLine.find(inputDaemonName) > -1 or psLine.find(outputDaemonName) > -1:
             for group in midiPorts:
                 for port in midiPorts[group]:
                     if psLine.find(str(port)) > -1:
@@ -101,69 +103,53 @@ def checkDaemon():
                 os.close(newStdErr)
                 os.close(1) # Close STDOUT
 
-                os.execlp(MIDI_DAEMON, daemonName, f'multilisten', '-u', str(port), '-C', name, '-P', name)
+                if port == midiPorts[group][0]: # Input port
+                    os.execlp(MIDI_INPUT_DAEMON, inputDaemonName, str(port), name)
+                else:
+                    os.execlp(MIDI_OUTPUT_DAEMON, outputDaemonName, f'multilisten', '-u', str(port), '-C', name, '-P', name)
 
 #
-# Using the aconnect command we can see all of the MIDI "ports" or "clients"
+# Use the alsa midi interface to see all of the MIDI "ports" or "clients"
 # that are open on this server; and all of the participants in those ports.
 # We're not interested in the low numbered prots (below 128) - when the MIDI
 # daemon starts it is allocated a port number from 128 upwards.
 #
-# Using the output we find all of the participants in the high numbered ports
-# and then join them all together. They could already be joined together but
-# aconnect doesn't care if we try to join two participants together that are
-# already joined to each other. We want to create a mesh between the
-# participants on each port/client; but not between ports/clients.
-#
-# Each port/client from the MIDI daemon will already have a "Network"
-# participants with a participant number of zero. The daemon will also
-# automatically discover the other daemons that are running so we ignore any
-# other participants with "midiHub" in the name. We only want to connect
-# remote participants to each other. We definitely don't want to connect
-# the daemons to each other - that's a valid MIDI configuration but not
-# suitable for our purposes here.
+# We want to connect an input port (the first port in the group) to an
+# output port (the second port in the group). This will prevent MIDI packet
+# loops (which are bad).
 #
 def checkMidiParticipants():
-    global logger, connectInAndOut
-
-    logger.debug('Getting output from aconnect')
-
-    try:
-        output = os.popen('aconnect -l').read().splitlines()
-    except Exception as e:
-        logger.error(f'Failed to get aconnect output: {e}')
-        return
+    global logger
 
     groupPorts = {}
-    for line in output:
-        logger.debug(f' Line: {line}')
-        if line.find('client ') == 0:
-            try:
-                clientNumber = re.findall(r'\d+', line)[0]
-            except:
-                logger.info(f'  Did not see client id in {line} - skipping')
-                continue
-            if int(clientNumber) < 128: continue
 
-            try:
-                nameList = re.findall(r"midiHub-.+'", line)[0][:-1].split('-')
-            except:
-                logger.info(f'  Did not see midiHub name in {line} - skipping')
-                continue
-
-            if nameList[1] not in groupPorts: groupPorts[nameList[1]] = []
-            groupPorts[f'{nameList[1]}-{nameList[2]}'] = clientNumber
+    alsaClient = alsa_midi.SequencerClient('midiHubController')
+    otherClients = alsaClient.list_ports()
+    for client in otherClients:
+        logger.debug(f' Client: {client.name}')
+        if client.name.startswith('midiHub-'):
+            nameList = client.name.split('-')
+            groupPorts[f'{nameList[1]}-{nameList[2]}'] = client
 
     for group in midiPorts:
         try:
             inPortClient = groupPorts[f'{group}-{midiPorts[group][0]}']
             outPortClient = groupPorts[f'{group}-{midiPorts[group][1]}']
         except Exception as e:
-            logger.warning(f'  aconnect client not found: {e}')
+            logger.warning(f'  alsa client not found: {e}')
             continue
 
-        logger.debug(f'  Adding connection for group {group} from client {inPortClient} to {outPortClient}')
-        os.system(f'aconnect {inPortClient}:0 {outPortClient}:0 >/dev/null 2>&1')
+        inputSubs = alsaClient.list_port_subscribers(inPortClient)
+        alreadySubscribed = False
+        for sub in inputSubs:
+            if sub.addr.client_id == outPortClient.client_id:
+                alreadySubscribed = True
+                logger.debug(f'  {inPortClient.name} already connected to {outPortClient.name}')
+                break
+
+        if not alreadySubscribed:
+            logger.info(f'  Adding connection for group {group} from client {inPortClient.name} to {outPortClient.name}')
+            alsaClient.subscribe_port(inPortClient, outPortClient)
 
 #
 # Although it's not completely harmful we don't really want more than one
@@ -206,8 +192,11 @@ def checkPrerequisites():
         return False
 
     logger.debug('Checking for MIDI daemon code')
-    if not os.path.isfile(MIDI_DAEMON):
-        logger.warning(f'Midi daemon not found at {MIDI_DAEMON} - stopping')
+    if not os.path.isfile(MIDI_INPUT_DAEMON):
+        logger.warning(f'pymidi daemon not found at {MIDI_INPUT_DAEMON} - stopping')
+        return False
+    if not os.path.isfile(MIDI_OUTPUT_DAEMON):
+        logger.warning(f'McLaren daemon not found at {MIDI_OUTPUT_DAEMON} - stopping')
         return False
 
     return True
@@ -220,8 +209,8 @@ def checkPrerequisites():
 # This is also called if we're sent SIGHUP mainly so that we can re-read the
 # ports configuration file.
 #
-def configure(signal, frame):
-    global logger, location, midiPorts, connectInAndOut
+def configure(singal, frame):
+    global logger, location, midiPorts
 
     try:
         with open('midiports') as portsFile:
