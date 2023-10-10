@@ -50,4 +50,3 @@ def lambda_handler(event, context):
             output.append(item)
 
     return(output)
-

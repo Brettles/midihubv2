@@ -23,5 +23,5 @@ def lambda_handler(event, context):
         return {'statusCode':500, 'body':'TransmitPorts not found'}
 
     transmitPorts = response.get('list', [])
-    return(transmitPorts)
 
+    return(transmitPorts)

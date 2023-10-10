@@ -10,7 +10,7 @@ This (somewhat tiny!) repo is here to help. Especially if you want to do this wi
 
 Linux can solve the first problem (virtual sound card) by supplying a "dummy" sound card, even in a virtual server environment. Without this, most applications that use the [ALSA](https://wiki.archlinux.org/title/Advanced_Linux_Sound_Architecture) libraries won't work. That includes anything that wants to use MIDI. Even if you have the ALSA tools and libraries installed, if there isn't a sound card present then everything just fails.
 
-The second problem is solved using ALSA as well - there is a command-line tool called `aconnect` which allows you to join those MIDI sources and targets with each other.
+The second problem is solved using ALSA as well - there is a command-line tool called `aconnect` which allows you to join those MIDI sources and targets with each other. There are also API interfaces so this can be called from Python code directly in order to enumerate other connections and join MIDI sources.
 
 The final piece of the puzzle is the different [RTP MIDI handler from McLaren Labs](https://mclarenlabs.com/rtpmidi/). Note that this is software you must purchase - it is not included in this repo. The instructions below will tell you how to install it but you must buy it from them.
 
@@ -27,7 +27,7 @@ In this repo this is what you get:
  - update-latency.py - A script that runs on the instance. It trawls the log files from `rtpmidi` and sends the contents to a DynamoDB database. Scheduled to run via cron once every minute.
  - create-s3-bucket.py - After the instance has been created this runs to create a S3 bucket with a unique name; link the CloudFront distirbution to it; set up secure access (the S3 bucket is not public; only CloudFront can access it); and uploads the HTML file after modifying it with the API Gateway endpoint URL. Note that if you are not deploying in the `us-east-1` region it make take some time (hours) for the CloudFront/S3 pair to work correctly.
  - midi-monitor.py - A troubleshooting tool to see what is being received on specific also ports. Find the name of the existing ports by running `aconnect -l` then use the port name (e.g. 'midiHub-GroupOne-5040') as a parameter to this utility. It will display notes currently playing the the MIDI channels they are playing on. Press ^C to exit.
- - alsaserver.py - A workaround for a small issue - this is used for "sanitising" the MIDI input.
+ - alsaserver.py - A workaround for a small software stability issue - this is used for "sanitising" the MIDI commands that are sent before they are delivered to ALSA.
 
 The intention is that you can run this solution when you need it and shut it down when you don't. To shut the solution down, you can go into the [EC2 console](https://console.aws.amazon.com/ec2/), select the instance labelled `midiHubv2` then choose "Instance state" (top-right of the browser window) and click "Stop instance". You'll notice there is a "Start instance" choice there too - that's how you can restart the virtual machine running MidiHub.
 
