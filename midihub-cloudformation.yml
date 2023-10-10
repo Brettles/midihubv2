@@ -637,8 +637,9 @@ Resources:
   #
   # Dummy CloudFront distribution which will be modified when the EC2 instance
   # starts. A script on the instance will create a S3 bucket; modify the base
-  # HTML file with the Lambda function URL; then update the CloudFront
-  # distribution to point to the bucket.
+  # HTML files with the API gateway URL; create an Origin Access Control
+  # identity; then update the CloudFront distribution to point to the bucket
+  # using the OAC as a link.
   #
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
