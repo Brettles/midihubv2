@@ -277,10 +277,10 @@ Resources:
     Properties:
       TableName: !Sub 'midiHubv2-${AWS::StackName}'
       AttributeDefinitions:
-      - AttributeName: "clientId"
-        AttributeType: "S"
+      - AttributeName: clientId
+        AttributeType: S
       KeySchema:
-      - AttributeName: "clientId"
+      - AttributeName: clientId
         KeyType: HASH
       BillingMode: PAY_PER_REQUEST
       TimeToLiveSpecification:
