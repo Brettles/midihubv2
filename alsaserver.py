@@ -157,7 +157,7 @@ def handleJournal(peer, packet):
                 logger.warning(f'*** There are {journal.header.totchan} channels here but we only deal with one')
                 break # Not right but we'll deal with it later
 
-            logger.info(f'--- Chapter Journal for channel {chapter.chan:2g} ---')
+            logger.info(f'--- Chapter Journal for channel {chapter.header.chan:2g} ---')
 
             #
             # Process the journal according to RFC6295
@@ -233,7 +233,7 @@ def handleJournal(peer, packet):
                 index += length
                 logger.info(f'    Poly aftertouch of {length} octets - ignored')
 
-            logger.info(f'--- End of channel {chapter.chan:2g} ---')
+            logger.info(f'--- End of channel {chapter.header.chan:2g} ---')
 
     peerStatus[peer.name].sequenceNumber = sequenceNumber
 
