@@ -77,7 +77,7 @@ class MyHandler(server.Handler):
         peerStatus.pop(peer.name, None)
 
     def on_midi_commands(self, peer, midi_packet):
-        if handleJournal(peer, midi_packet.journal):
+        if handleJournal(peer, midi_packet):
             for command in midi_packet.command.midi_list:
                 self.logger.info(f'{peer.name} sent {command.command}')
 
@@ -153,7 +153,7 @@ def handleJournal(peer, packet):
             if channelNumber == 0:
                 chapter = journal.channel_journal # Called a Chapter Journal in the RFC
             else:
-                logger.warning(f'*** There are {journal.header.totchan} channels here but we aren't dealing with them')
+                logger.warning(f'*** There are {journal.header.totchan} channels here but we only deal with one')
                 break # Not right but we'll deal with it later
 
             logger.info(f'--- Chapter Journal for channel {chapter.chan:2g} ---')
