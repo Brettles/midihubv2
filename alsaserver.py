@@ -188,15 +188,15 @@ def handleJournal(peer, packet, alsaClient):
 
             if chapter.header.w: # Fixed size of two octets - Appendix A.5
                 sBit = chapter.journal[index] & 0x80 # More logic required if this is set
-                wheelFirst = chapter.journal[index] & 0x7f
-                wheelSecond = chapter.journal[index+1] & 0x7f
-                pitchWheelValue = wheelFirst*256+wheelSecond
+                wheelCoarse = chapter.journal[index] & 0x7f
+                wheelFine = chapter.journal[index+1] & 0x7f
+                pitchWheelValue = wheelCoarse*256+wheelFine
                 index += 2
                 logger.info(f'    Pitch wheel change to {pitchWheelValue}')
 
-                existingValue = peerStatus[peer.name].channelInfo[midiChannel].pitchWheel
+                existingValue = peerStatus[peer.name].channelInfo[midiChannel]['pitchWheel']
                 if existingValue != pitchWheelValue:
-                    logger.warning(f'    Existing value is {existingValue} - changing')
+                    logger.warning(f'    Existing value is {existingValue} - changing to {pitchWheelValue}')
                     alsaEvents.append(alsa_midi.PitchBendEvent(value=pitchWheelValue, channel=midiChannel))
                     peerStatus[peer.name].pitchWheel(midiChannel, pitchWheelValue)
 
