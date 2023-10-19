@@ -212,8 +212,8 @@ def handleJournal(peer, packet, alsaClient):
                 existingValue = peerStatus[peer.name].channelInfo[midiChannel]['pitchWheel']
                 if existingValue != pitchWheelValue:
                     logger.warning(f'    Existing value is {existingValue} - changing to {pitchWheelValue}')
-                    alsaEvents.append(alsa_midi.PitchBendEvent(value=pitchWheelValue, channel=midiChannel))
-                    peerStatus[peer.name].pitchWheel(midiChannel, pitchWheelValue)
+#                    alsaEvents.append(alsa_midi.PitchBendEvent(value=pitchWheelValue, channel=midiChannel))
+#                    peerStatus[peer.name].pitchWheel(midiChannel, pitchWheelValue)
 
             if chapter.header.n: # Appendix A.6
                 try: # Not great wrapping this up in a big try/except but this is experimental code...
