@@ -133,6 +133,107 @@ def handleJournal(peer, packet):
         else:
             logger.warning(f'This seq={sequenceNumber} > last={peerStatus[peer.name].sequenceNumber} - processing journal')
 
+    logger.info('--- Journal handling ---')
+  
+    if not journal.header.a and not journal.header.y: logger.info('  Empty journal')
+    if journal.header.s: logger.info('   Single packet loss flag')
+    if journal.header.h: logger.info('   Enhanced chapter C encoding')
+
+    if journal.header.y: 
+        logger.info('--- System Journal ---')
+        logger.info(journal.system_journal)
+        logger.info('----------------------')
+
+    if journal.header.a:
+        for channelNumber in range(journal.header.totchan):
+            #
+            # Issue here is that the pymidi software only thinks there is a
+            # single channel in the chapter journal but in reality there can be
+            # more than one (hence the loop).
+            if channelNumber == 0:
+                chapter = journal.channel_journal # Called a Chapter Journal in the RFC
+            else:
+                logger.warning(f'*** There are {journal.header.totchan} channels here but we aren't dealing with them')
+                break # Not right but we'll deal with it later
+
+            logger.info(f'--- Chapter Journal for channel {chapter.chan:2g} ---')
+
+            #
+            # Process the journal according to RFC6295
+            # This first cut does not loop through the journal as it should so
+            # if there are multiple channels we may miss something - the logging
+            # will reflect that.
+            #
+            index = 0
+    
+            if chapter.header.p: # Fixed size of three octets - Appendix A.2
+                index += 3
+                logger.info('    Program change - ignored')
+
+            if chapter.header.c: # Appendix A.3
+                headerFirst = chapter.journal[index]
+                length = headerFirst & 0x7f
+                index += length
+                logger.info(f'    Control change of {length} octets - ignored')
+
+            if chapter.header.m: # Appendix A.4
+                headerFirst = chapter.journal[index]&0x03
+                headerSecond = chapter.journal[index+1]
+                length = headerFirst*256+headerSecond
+                index += length
+                logger.info(f'    Parameter change of {length} octets - ignored')
+
+            if chapter.header.w: # Fixed size of two octets - Appendix A.5
+                wheelFirst = chapter.journal[index]&0x7f
+                wheelSecond = chapter.journal[index+1]&0x7f
+                pitchWheelValue = wheelFirst*256+wheelSecond
+                index += 2
+                logger.info(f'    Pitch wheel change to {pitchWheelValue}')
+
+            if chapter.header.n: # Appendix A.6
+                headerFirst = chapter.journal[index]
+                length = headerFirst & 0x7f
+                logger.info(f'    Note on/off of {length*2} octets')
+
+                if headerFirst & 0x80: logger.info('      B (s-bit) set - previous packet had a NoteOff in it')
+
+                if length*2 > len(chapter.journal)-2:
+                    logger.warning(f'      WARNING: note on/off header says length is {length*2} but actual length is {len(chapter.journal)-2}')
+                    break # Probably not the right thing to do but it is safe
+
+                headerSecond = chapter.journal[index+1]
+                high = headerSecond & 0x0f
+                low = (headerSecond & 0xf0) >> 4
+
+                index += 2
+                for i in range(length): # Length is data length in two-octet groups
+                    logger.info(f'      Notes: {hex(channel.journal[index])} {hex(channel.journal[index+1])}')
+                    index += 2
+
+                #
+                # More to do here based on the high and low values above - not implemented yet
+                # Things after this probably won't work correctly but that's ok because we only
+                # loop once the moment anyway
+                #
+
+            if chapter.header.e: # Appendix A.7
+                headerFirst = chapter.journal[index]
+                length = headerFirst & 0x7f
+                index += length
+                logger.info(f'    Note extras of {length} octets - ignored')
+
+            if chapter.header.t: # Fixed size of one octet - Appendix A.8
+                index += 1
+                logger.info('    Channel aftertouch - ignored')
+
+            if chapter.header.a: # Appendix A.9
+                headerFirst = chapter.journal[index]
+                length = headerFirst & 0x7f
+                index += length
+                logger.info(f'    Poly aftertouch of {length} octets - ignored')
+
+            logger.info(f'--- End of channel {chapter.chan:2g} ---')
+
     peerStatus[peer.name].sequenceNumber = sequenceNumber
 
     #
