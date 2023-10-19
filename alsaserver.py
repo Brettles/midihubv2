@@ -174,22 +174,37 @@ def handleJournal(peer, packet, alsaClient):
                 logger.info('    Program change - ignored')
 
             if chapter.header.c: # Appendix A.3
-                headerFirst = chapter.journal[index]
-                length = headerFirst & 0x7f
+                try:
+                    header = chapter.journal[index]
+                except Exception as e:
+                    logger.error(f'    Failed to get control change header: {e}')
+                    break
+
+                length = header & 0x7f
                 index += length
                 logger.info(f'    Control change of {length} octets - ignored')
 
             if chapter.header.m: # Appendix A.4
-                headerFirst = chapter.journal[index] & 0x03
-                headerSecond = chapter.journal[index+1]
+                try:
+                    headerFirst = chapter.journal[index] & 0x03
+                    headerSecond = chapter.journal[index+1]
+                except Exception as e:
+                    logger.error(f'    Failed to get parameter change header: {e}')
+                    break
+
                 length = headerFirst*256+headerSecond
                 index += length
                 logger.info(f'    Parameter change of {length} octets - ignored')
 
             if chapter.header.w: # Fixed size of two octets - Appendix A.5
-                sBit = chapter.journal[index] & 0x80 # More logic required if this is set
-                wheelCoarse = chapter.journal[index] & 0x7f
-                wheelFine = chapter.journal[index+1] & 0x7f
+                try:
+                    sBit = chapter.journal[index] & 0x80 # More logic required if this is set (or not)
+                    wheelFine = chapter.journal[index] & 0x7f
+                    wheelCoarse = chapter.journal[index+1] & 0x7f
+                except Exception as e:
+                    logger.error(f'    Failed to get pitchwheel header: {e}')
+                    break
+
                 pitchWheelValue = wheelCoarse*256+wheelFine
                 index += 2
                 logger.info(f'    Pitch wheel change to {pitchWheelValue}')
@@ -201,35 +216,42 @@ def handleJournal(peer, packet, alsaClient):
                     peerStatus[peer.name].pitchWheel(midiChannel, pitchWheelValue)
 
             if chapter.header.n: # Appendix A.6
-                headerFirst = chapter.journal[index]
-                length = headerFirst & 0x7f
-                logger.info(f'    Note on/off of {length*2} octets')
+                try: # Not great wrapping this up in a big try/except but this is experimental code...
+                    sBit = chapter.journal[index] & 0x80
+                    length = chapter.journal[index] & 0x7f
+                    logger.info(f'    Note on/off of {length*2} octets')
 
-                sBit = headerFirst & 0x80
-                if sBit: logger.info('      B (s-bit) set - previous packet had a NoteOff in it')
+                    if sBit: logger.info('      B (s-bit) set - previous packet had a NoteOff in it')
 
-                if length*2 > len(chapter.journal)-2:
-                    logger.warning(f'      *** Note on/off header says length is {length*2} but actual length is {len(chapter.journal)-2}')
-                    break # Probably not the right thing to do but it is safe
+                    if length*2 > len(chapter.journal)-2:
+                        logger.warning(f'      *** Note on/off header says length is {length*2} but actual length is {len(chapter.journal)-2}')
+                        break # Probably not the right thing to do but it is safer this way
 
-                headerSecond = chapter.journal[index+1]
-                high = headerSecond & 0x0f
-                low = (headerSecond & 0xf0) >> 4
+                    high = chapter.journal[index+1] & 0x0f
+                    low = (chapter.journal[index+1] & 0xf0) >> 4
 
-                index += 2
-                for i in range(length): # Length is data length in two-octet groups
-                    logger.info(f'      Notes: {hex(chapter.journal[index])} {hex(chapter.journal[index+1])}')
                     index += 2
+                    for i in range(length): # Length is data length in two-octet groups
+                        logger.info(f'      Notes: {hex(chapter.journal[index])} {hex(chapter.journal[index+1])}')
+                        index += 2
 
-                #
-                # More to do here based on the high and low values above - not implemented yet
-                # Things after this probably won't work correctly but that's ok because we only
-                # loop once the moment anyway
-                #
+                    #
+                    # More to do here based on the high and low values above - not implemented yet
+                    # Things after this probably won't work correctly but that's ok because we only
+                    # loop once the moment anyway
+                    #
+                except Exception as e:
+                    logger.error(f'    Failed to get note on/off header: {e}')
+                    break
 
             if chapter.header.e: # Appendix A.7
-                headerFirst = chapter.journal[index]
-                length = headerFirst & 0x7f
+                try:
+                    header = chapter.journal[index]
+                except Exception as e:
+                    logger.error(f'    Failed to get note extras header: {e}')
+                    break
+
+                length = header & 0x7f
                 index += length
                 logger.info(f'    Note extras of {length} octets - ignored')
 
@@ -238,8 +260,13 @@ def handleJournal(peer, packet, alsaClient):
                 logger.info('    Channel aftertouch - ignored')
 
             if chapter.header.a: # Appendix A.9
-                headerFirst = chapter.journal[index]
-                length = headerFirst & 0x7f
+                try:
+                    header = chapter.journal[index]
+                except Exception as e:
+                    logger.error(f'    Failed to get poly aftertouch header: {e}')
+                    break
+
+                length = header & 0x7f
                 index += length
                 logger.info(f'    Poly aftertouch of {length} octets - ignored')
 
