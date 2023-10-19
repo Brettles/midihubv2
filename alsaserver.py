@@ -92,7 +92,7 @@ class MyHandler(server.Handler):
                 elif command.command == 'aftertouch':
                     event = alsa_midi.KeyPressureEvent(note=command.params.key, velocity=command.params.touch, channel=command.channel)
                 elif command.command == 'pitch_bend_change':
-                    pitchWheelValue = command.params.msb*256+command.param.lsb
+                    pitchWheelValue = command.params.msb*256+command.params.lsb
                     event = alsa_midi.PitchBendEvent(value=pitchWheelValue, channel=command.channel)
                     peerStatus[peer.name].pitchWheel(command.channel, pitchWheelValue)
                 elif command.command == 'control_mode_change':
