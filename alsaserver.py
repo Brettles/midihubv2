@@ -146,7 +146,7 @@ def handleJournal(peer, packet):
         logger.info('----------------------')
 
     if journal.header.a:
-        for channelNumber in range(journal.header.totchan):
+        for channelNumber in range(journal.header.totchan+1):
             #
             # Issue here is that the pymidi software only thinks there is a
             # single channel in the chapter journal but in reality there can be
