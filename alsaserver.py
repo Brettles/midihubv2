@@ -6,6 +6,7 @@ import pymidi
 import logging
 import sys
 import signal
+import time
 import alsa_midi
 
 #
