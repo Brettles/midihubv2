@@ -196,7 +196,7 @@ def handleJournal(peer, packet, alsaClient):
 
                 existingValue = peerStatus[peer.name].pitchWheel[midiChannel]
                 if existingValue != pitchWheelValue:
-                    logger.warning(f'    Existing value is {} - changing')
+                    logger.warning(f'    Existing value is {existingValue} - changing')
                     alsaEvents.append(alsa_midi.PitchBendEvent(value=pitchWheelValue, channel=midiChannel))
                     peerStatus[peer.name].pitchWheel(midiChannel, pitchWheelValue)
 
