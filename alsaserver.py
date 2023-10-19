@@ -208,7 +208,7 @@ def handleJournal(peer, packet):
 
                 index += 2
                 for i in range(length): # Length is data length in two-octet groups
-                    logger.info(f'      Notes: {hex(channel.journal[index])} {hex(channel.journal[index+1])}')
+                    logger.info(f'      Notes: {hex(chapter.journal[index])} {hex(chapter.journal[index+1])}')
                     index += 2
 
                 #
