@@ -78,7 +78,7 @@ class MyHandler(server.Handler):
         peerStatus.pop(peer.name, None)
 
     def on_midi_commands(self, peer, midi_packet):
-        if handleJournal(peer, midi_packet):
+        if handleJournal(peer, midi_packet, self.alsaClient):
             for command in midi_packet.command.midi_list:
                 self.logger.info(f'{peer.name} sent {command.command}')
 
@@ -108,8 +108,8 @@ class MyHandler(server.Handler):
 
             self.alsaClient.drain_output()
 
-def handleJournal(peer, packet):
-    global logger, outputSocket
+def handleJournal(peer, packet, alsaClient):
+    global logger, outputSocket, peerStatus
 
     journal = packet.journal
     sequenceNumber = packet.header.rtp_header.sequence_number
@@ -157,7 +157,8 @@ def handleJournal(peer, packet):
                 logger.warning(f'*** There are {journal.header.totchan} channels here but we only deal with one')
                 break # Not right but we'll deal with it later
 
-            logger.info(f'--- Chapter Journal for channel {chapter.header.chan:2g} ---')
+            midiChannel = chapter.header.chan
+            logger.info(f'--- Chapter Journal for channel {midiChannel:2g} ---')
 
             #
             # Process the journal according to RFC6295
@@ -166,6 +167,7 @@ def handleJournal(peer, packet):
             # will reflect that.
             #
             index = 0
+            alsaEvents = []
     
             if chapter.header.p: # Fixed size of three octets - Appendix A.2
                 index += 3
@@ -178,28 +180,36 @@ def handleJournal(peer, packet):
                 logger.info(f'    Control change of {length} octets - ignored')
 
             if chapter.header.m: # Appendix A.4
-                headerFirst = chapter.journal[index]&0x03
+                headerFirst = chapter.journal[index] & 0x03
                 headerSecond = chapter.journal[index+1]
                 length = headerFirst*256+headerSecond
                 index += length
                 logger.info(f'    Parameter change of {length} octets - ignored')
 
             if chapter.header.w: # Fixed size of two octets - Appendix A.5
-                wheelFirst = chapter.journal[index]&0x7f
-                wheelSecond = chapter.journal[index+1]&0x7f
+                sBit = chapter.journal[index] & 0x80 # More logic required if this is set
+                wheelFirst = chapter.journal[index] & 0x7f
+                wheelSecond = chapter.journal[index+1] & 0x7f
                 pitchWheelValue = wheelFirst*256+wheelSecond
                 index += 2
                 logger.info(f'    Pitch wheel change to {pitchWheelValue}')
+
+                existingValue = peerStatus[peer.name].pitchWheel[midiChannel]
+                if existingValue != pitchWheelValue:
+                    logger.warning(f'    Existing value is {} - changing')
+                    alsaEvents.append(alsa_midi.PitchBendEvent(value=pitchWheelValue, channel=midiChannel))
+                    peerStatus[peer.name].pitchWheel(midiChannel, pitchWheelValue)
 
             if chapter.header.n: # Appendix A.6
                 headerFirst = chapter.journal[index]
                 length = headerFirst & 0x7f
                 logger.info(f'    Note on/off of {length*2} octets')
 
-                if headerFirst & 0x80: logger.info('      B (s-bit) set - previous packet had a NoteOff in it')
+                sBit = headerFirst & 0x80
+                if sBit: logger.info('      B (s-bit) set - previous packet had a NoteOff in it')
 
                 if length*2 > len(chapter.journal)-2:
-                    logger.warning(f'      WARNING: note on/off header says length is {length*2} but actual length is {len(chapter.journal)-2}')
+                    logger.warning(f'      *** Note on/off header says length is {length*2} but actual length is {len(chapter.journal)-2}')
                     break # Probably not the right thing to do but it is safe
 
                 headerSecond = chapter.journal[index+1]
@@ -233,7 +243,12 @@ def handleJournal(peer, packet):
                 index += length
                 logger.info(f'    Poly aftertouch of {length} octets - ignored')
 
-            logger.info(f'--- End of channel {chapter.header.chan:2g} ---')
+            if alsaEvents:
+                for event in alsaEvents:
+                    alsaClient.event_output(event)
+                alsaClient.drain_output()
+
+            logger.info(f'--- End of channel {midiChannel:2g} ---')
 
     peerStatus[peer.name].sequenceNumber = sequenceNumber
 
