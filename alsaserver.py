@@ -277,7 +277,7 @@ def handleJournal(peer, packet, alsaClient):
                     logger.warning(f'      *** Note on/off header says noteOnOctets is {noteOnOctets*2} but actual length is {len(chapter.journal)-2}')
                     break # Probably not the right thing to do but it is safer this way
 
-                if low > high:
+                if low != 15 and low > high:
                     logger.error(f'    NoteOff error: low {low} > high {high}')
                     break
 
