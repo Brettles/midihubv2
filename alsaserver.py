@@ -254,8 +254,8 @@ def handleJournal(peer, packet, alsaClient):
                 try:
                     sBit = True if chapter.journal[index] & 0x80 else False
                     noteOnOctets = chapter.journal[index] & 0x7f
-                    low = chapter.journal[index+1] & 0x0f
-                    high = (chapter.journal[index+1] & 0xf0) >> 4
+                    high = chapter.journal[index+1] & 0x0f
+                    low = (chapter.journal[index+1] & 0xf0) >> 4
                 except Exception as e:
                     logger.error(f'    Failed to get NoteOn/Off header: {e}')
                     break
@@ -299,7 +299,7 @@ def handleJournal(peer, packet, alsaClient):
                         logger.error(f'    Failed to get NoteOn data: {e}')
                         break
 
-                    logger.info(f'       NoteOff {hex(noteOn)} {hex(velocity)} sBit: {noteSBit} yBit: {noteYBit}')
+                    logger.info(f'       NoteOn {hex(noteOn)} {hex(velocity)} sBit: {noteSBit} yBit: {noteYBit}')
                     index += 2
 
                 #
