@@ -309,30 +309,22 @@ def handleJournal(peer, packet, alsaClient):
                 # state of the existing note but if it's already off and we turn
                 # it off again - no big deal.
                 #
-                for i in range[noteOffOctets]:
+                noteOffIndex = 8*low
+                for i in range(noteOffOctets):
                     try:
-                        noteOffLow = chapter.journal[index]
-                        noteOffHigh = chapter.journal[index+1]
+                        noteOffBits = chapter.journal[index]
                     except Exception as e:
                         logger.error(f'    Failed to get NoteOff data: {e}')
                         break
 
-                    noteOffLow = 8*low
-                    noteOffHigh = 8*high
-
                     for bit in reversed(range(8)):
                         bitMask = pow(2, bit)
-                        if noteOffLow & bitMask:
-                            logger.info(f'       NoteOff {hex(noteOffLow)}')
-                            alsaEvents.append(alsa_midi.NoteOffEvent(note=noteOffLow, channel=midiChannel))
-                            peerStatus[peer.name].noteOff(midiChannel, noteOffLow)
-                        if noteOffHigh & bitMask:
-                            logger.info(f'       NoteOff {hex(noteOffHigh)}')
-                            alsaEvents.append(alsa_midi.NoteOffEvent(note=noteOffHigh, channel=midiChannel))
-                            peerStatus[peer.name].noteOff(midiChannel, noteOffHigh)
+                        if noteOffBits & bitMask:
+                            logger.info(f'       NoteOff {hex(noteOffIndex)}')
+                            alsaEvents.append(alsa_midi.NoteOffEvent(note=noteOffIndex, channel=midiChannel))
+                            peerStatus[peer.name].noteOff(midiChannel, noteOffIndex)
 
-                        noteOffLow += 1
-                        noteOffHigh += 1
+                        noteOffIndex += 1
 
                     index += 2
 
