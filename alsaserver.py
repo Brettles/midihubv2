@@ -230,7 +230,7 @@ def handleJournal(peer, packet, alsaClient):
 
             if chapter.header.w: # Fixed size of two octets - Appendix A.5
                 try:
-                    sBit = chapter.journal[index] & 0x80 # More logic required if this is set (or not)
+                    sBit = True if chapter.journal[index] & 0x80 else False # More logic required if this is set (or not)
                     wheelFine = chapter.journal[index] & 0x7f
                     wheelCoarse = chapter.journal[index+1] & 0x7f
                 except Exception as e:
@@ -252,10 +252,10 @@ def handleJournal(peer, packet, alsaClient):
                 # Logic is from Appendix A.6.1
                 #
                 try:
-                    sBit = chapter.journal[index] & 0x80
+                    sBit = True if chapter.journal[index] & 0x80 else False
                     noteOnOctets = chapter.journal[index] & 0x7f
-                    high = chapter.journal[index+1] & 0x0f
-                    low = (chapter.journal[index+1] & 0xf0) >> 4
+                    low = chapter.journal[index+1] & 0x0f
+                    high = (chapter.journal[index+1] & 0xf0) >> 4
                 except Exception as e:
                     logger.error(f'    Failed to get NoteOn/Off header: {e}')
                     break
@@ -290,19 +290,54 @@ def handleJournal(peer, packet, alsaClient):
                 # First are the NoteOn structures. We ignore these - it's
                 # moderately important that we replay these but in the scheme
                 # of things if a NoteOn is missed it isn't terrible. So for
-                # now, we do nothing.
+                # now, we do nothing with missed NoteOn events.
                 #
                 for i in range(noteOnOctets): # noteOnOctets is data length in two-octet groups
-                    logger.info(f'      Notes: {hex(chapter.journal[index])} {hex(chapter.journal[index+1])}')
+                    try:
+                        noteSBit = True if chapter.journal[index] & 0x80 else False
+                        noteYBit = True if chapter.journal[index+1] & 0x80 else False
+                        noteOn = chapter.journal[index] & 0x7f
+                        velocity = chapter.journal[index+1] & 0x7f
+                    except Exception as e:
+                        logger.error(f'    Failed to get NoteOn data: {e}')
+                        break
+
+                    logger.info(f'       NoteOff {hex(noteOn)} {hex(velocity)} sBit: {noteSBit} yBit: {noteYBit}')
                     index += 2
 
+                #
+                # NoteOff events are a different matter. We want to clear them
+                # and if we accidentally clear a note that shouldn't have been
+                # that's not a terrible outcome. In theory, we can check the
+                # state of the existing note but if it's already off and we turn
+                # it off again - no big deal.
+                #
+                for i in range[noteOffOctets]:
+                    try:
+                        noteOffLow = chapter.journal[index]
+                        noteOffHigh = chapter.journal[index+1]
+                    except Exception as e:
+                        logger.error(f'    Failed to get NoteOff data: {e}')
+                        break
 
+                    noteOffLow = 8*low
+                    noteOffHigh = 8*high
 
-                    #
-                    # More to do here based on the high and low values above - not implemented yet
-                    # Things after this probably won't work correctly but that's ok because we only
-                    # loop once the moment anyway
-                    #
+                    for bit in reversed(range(8)):
+                        bitMask = pow(2, bit)
+                        if noteOffLow & bitMask:
+                            logger.info(f'       NoteOff {hex(noteOffLow)}')
+                            alsaEvents.append(alsa_midi.NoteOffEvent(note=noteOffLow, channel=midiChannel))
+                            peerStatus[peer.name].noteOff(midiChannel, noteOffLow)
+                        if noteOffHigh & bitMask:
+                            logger.info(f'       NoteOff {hex(noteOffHigh)}')
+                            alsaEvents.append(alsa_midi.NoteOffEvent(note=noteOffHigh, channel=midiChannel))
+                            peerStatus[peer.name].noteOff(midiChannel, noteOffHigh)
+
+                        noteOffLow += 1
+                        noteOffHigh += 1
+
+                    index += 2
 
             if chapter.header.e: # Appendix A.7
                 try:
@@ -331,8 +366,12 @@ def handleJournal(peer, packet, alsaClient):
                 logger.info(f'    Poly aftertouch of {length} octets - ignored')
 
             if alsaEvents:
+                counter = 1
                 for event in alsaEvents:
                     alsaClient.event_output(event)
+
+                    if not counter%8: alsaClient.drain_output()
+                    counter += 1
                 alsaClient.drain_output()
 
             logger.info(f'--- End of channel {midiChannel:2g} ---')
