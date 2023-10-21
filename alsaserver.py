@@ -262,8 +262,11 @@ def handleJournal(peer, packet, alsaClient):
 
                 if noteOnOctets == 127 and low == 15 and high == 0: noteOnOctets = 128
 
-                logger.info(f'    NoteOn octest: {noteOnOctets*2}')
-                if sBit: logger.info('      B (s-bit) set - previous packet had a NoteOff in it')
+                noteOffOctets = 0
+                if low <= high: noteOffOctets = high-low+1
+                if low == 15 and (high == 0 or high == 1): noteOffOctets = 0 # Already set but for logic clarity
+
+                logger.info(f'    NoteOn octets: {noteOnOctets*2} NoteOff octets: {noteOffOctets} Low: {low} High: {high} B (S-bit): {sBit}')
 
                 #
                 # Commonly seeing numbers where the structure extends past the
@@ -277,12 +280,6 @@ def handleJournal(peer, packet, alsaClient):
                 if low > high:
                     logger.error(f'    NoteOff error: low {low} > high {high}')
                     break
-
-                noteOffOctets = 0
-                if low <= high: noteOffOctets = high-low+1
-                if low == 15 and (high == 0 or high == 1): noteOffOctets = 0 # Already set but for logic clarity
-
-                logger.info(f'    NoteOff octets: {noteOffOctets}')
 
                 index += 2 # Skip the header bytes
                     
