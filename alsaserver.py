@@ -108,6 +108,25 @@ class MyHandler(server.Handler):
 
             self.alsaClient.drain_output()
 
+#
+# This is minimal journal handling - not everything as defined in RFC6295.
+# We want to handle the worst-case things that happen: NoteOff events that get
+# lost and pitch wheel events. Other things are probably going to affect a
+# performance and we may have to deal with them later but as this is being
+# written those two things are the major contributors to "stuck notes" and
+# tuning/pitch problems.
+#
+# I make not very many apologies for the messiness of this code - the RTP MIDI
+# journal system is highly complex - perhaps even more complex than it really
+# needs to be (probably in the interest of savings some bytes on the wire).
+#
+# I've looked for example code for this and there isn't any (that I can find)
+# which makes sense given how complex it is - there's a lot of time and effort
+# that goes into making this work reliably.
+#
+# I highly advise that you don't use this in a production environment. It is
+# not rigorously tested.
+#
 def handleJournal(peer, packet, alsaClient):
     global logger, outputSocket, peerStatus
 
@@ -126,18 +145,26 @@ def handleJournal(peer, packet, alsaClient):
         logger.warning(f'This seq={sequenceNumber} < last={peerStatus[peer.name].sequenceNumber} - skipping')
         return False
 
+    #
+    # Decide what to do based on RFC4696 Section 7
+    #
+    singlePacketLoss = False
     if sequenceNumber > peerStatus[peer.name].sequenceNumber+1: # We have missed a packet somewhere
         if not journal.header.a:
             logger.warning('Missed packets but no journal present - continuing')
         elif sequenceNumber == peerStatus[peer.name].sequenceNumber-1 and journal.header.s: # Single packet loss
             logger.warning('Single packet loss identified - continuing')
+            singlePacketLoss = True
         else:
             logger.warning(f'This seq={sequenceNumber} > last={peerStatus[peer.name].sequenceNumber} - processing journal')
+
+    peerStatus[peer.name].sequenceNumber = sequenceNumber
+    if singlePacketLoss: return true
 
     logger.info('--- Journal handling ---')
   
     if not journal.header.a and not journal.header.y: logger.info('  Empty journal')
-    if journal.header.s: logger.info('   Single packet loss flag')
+    if journal.header.s: logger.info('   Single packet loss flag - ignoring because handling multi packet loss')
     if journal.header.h: logger.info('   Enhanced chapter C encoding')
 
     if journal.header.y: 
@@ -149,8 +176,13 @@ def handleJournal(peer, packet, alsaClient):
         for channelNumber in range(journal.header.totchan+1):
             #
             # Issue here is that the pymidi software only thinks there is a
-            # single channel in the chapter journal but in reality there can be
-            # more than one (hence the loop).
+            # single channel in the chapter journal but in reality there can
+            # be more than one (hence the loop).
+            #
+            # On the first loop the header is encoded into the structure but
+            # every subsequent loop the header will need to be extracted from
+            # the bit stream.
+            #
             if channelNumber == 0:
                 chapter = journal.channel_journal # Called a Chapter Journal in the RFC
             else:
@@ -216,33 +248,61 @@ def handleJournal(peer, packet, alsaClient):
 #                    peerStatus[peer.name].pitchWheel(midiChannel, pitchWheelValue)
 
             if chapter.header.n: # Appendix A.6
-                try: # Not great wrapping this up in a big try/except but this is experimental code...
+                #
+                # Logic is from Appendix A.6.1
+                #
+                try:
                     sBit = chapter.journal[index] & 0x80
-                    length = chapter.journal[index] & 0x7f
-                    logger.info(f'    Note on/off of {length*2} octets')
-
-                    if sBit: logger.info('      B (s-bit) set - previous packet had a NoteOff in it')
-
-                    if length*2 > len(chapter.journal)-2:
-                        logger.warning(f'      *** Note on/off header says length is {length*2} but actual length is {len(chapter.journal)-2}')
-                        break # Probably not the right thing to do but it is safer this way
-
+                    noteOnOctets = chapter.journal[index] & 0x7f
                     high = chapter.journal[index+1] & 0x0f
                     low = (chapter.journal[index+1] & 0xf0) >> 4
+                except Exception as e:
+                    logger.error(f'    Failed to get NoteOn/Off header: {e}')
+                    break
 
+                if noteOnOctets == 127 and low == 15 and high == 0: noteOnOctets = 128
+
+                logger.info(f'    NoteOn octest: {noteOnOctets*2}')
+                if sBit: logger.info('      B (s-bit) set - previous packet had a NoteOff in it')
+
+                #
+                # Commonly seeing numbers where the structure extends past the
+                # end of the packet. This is (obviously) not good so we ignore
+                # them.
+                #
+                if noteOnOctets*2 > len(chapter.journal)-2:
+                    logger.warning(f'      *** Note on/off header says noteOnOctets is {noteOnOctets*2} but actual length is {len(chapter.journal)-2}')
+                    break # Probably not the right thing to do but it is safer this way
+
+                if low > high:
+                    logger.error(f'    NoteOff error: low {low} > high {high}')
+                    break
+
+                noteOffOctets = 0
+                if low <= high: noteOffOctets = high-low+1
+                if low == 15 and (high == 0 or high == 1): noteOffOctets = 0 # Already set but for logic clarity
+
+                logger.info(f'    NoteOff octets: {noteOffOctets}')
+
+                index += 2 # Skip the header bytes
+                    
+                #
+                # First are the NoteOn structures. We ignore these - it's
+                # moderately important that we replay these but in the scheme
+                # of things if a NoteOn is missed it isn't terrible. So for
+                # now, we do nothing.
+                #
+                for i in range(noteOnOctets): # noteOnOctets is data length in two-octet groups
+                    logger.info(f'      Notes: {hex(chapter.journal[index])} {hex(chapter.journal[index+1])}')
                     index += 2
-                    for i in range(length): # Length is data length in two-octet groups
-                        logger.info(f'      Notes: {hex(chapter.journal[index])} {hex(chapter.journal[index+1])}')
-                        index += 2
+
+
 
                     #
                     # More to do here based on the high and low values above - not implemented yet
                     # Things after this probably won't work correctly but that's ok because we only
                     # loop once the moment anyway
                     #
-                except Exception as e:
-                    logger.error(f'    Failed to get note on/off header: {e}')
-                    break
 
             if chapter.header.e: # Appendix A.7
                 try:
@@ -276,8 +336,6 @@ def handleJournal(peer, packet, alsaClient):
                 alsaClient.drain_output()
 
             logger.info(f'--- End of channel {midiChannel:2g} ---')
-
-    peerStatus[peer.name].sequenceNumber = sequenceNumber
 
     #
     # Send feedback to the MIDI client (this is an Apple thing but everyone seems to do it)
