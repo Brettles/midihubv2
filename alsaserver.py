@@ -173,7 +173,7 @@ def handleJournal(peer, packet, alsaClient):
         logger.info('----------------------')
 
     if journal.header.a:
-#        allJournals = journal.channel_journal
+        allJournals = journal.channel_journal
         index = 0
 
         for channelNumber in range(journal.header.totchan+1):
@@ -196,7 +196,18 @@ def handleJournal(peer, packet, alsaClient):
             # the pymidi structure because in future I might find an easier
             # way of doing this (my Python-fu is failing at this point).
             #
-#            logger.info(f' Loop {channelNumber+1} - index: {index} total length: {len(allJournals)}')
+            logger.info(f' Loop {channelNumber+1} - index: {index} total length: {len(allJournals)}')
+            chapter = journal.channel_journal
+            try:
+                myByte = chapter[index]
+            except:
+                print('chapter failed')
+
+            try:
+                firstByte = allJournals[index]
+            except:
+                print('allJournals failed')
+
 #            try:
 #                firstByte = allJournals[index]
 #                secondByte = allJournals[index+1]
@@ -222,8 +233,6 @@ def handleJournal(peer, packet, alsaClient):
 #                logger.info(f'   Failed to decode chapter header: {e}')
 #                break
 
-            chapter = journal.channel_journal
-            print(type(chapter))
             index += 3
 
             midiChannel = chapter.header.chan
