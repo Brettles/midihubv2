@@ -131,34 +131,40 @@ def handleJournal(peer, packet, alsaClient):
     global logger, outputSocket, peerStatus
 
     journal = packet.journal
-    sequenceNumber = packet.header.rtp_header.sequence_number
+    theirSequenceNumber = packet.header.rtp_header.sequence_number
+    mySequenceNumber = peerStatus[peer.name].sequenceNumber
 
-    if not peerStatus[peer.name].sequenceNumber: # This is the first packet from this peer
-        peerStatus[peer.name].sequenceNumber = sequenceNumber
+    logger.info(f'Sequence number: {theirSequenceNumber} My sequence number: {mySequenceNumber}')
+    if not mySequenceNumber: # This is the first packet from this peer
+        peerStatus[peer.name].sequenceNumber = theirSequenceNumber
         return True
 
     if not journal:
-        peerStatus[peer.name].sequenceNumber = sequenceNumber
+        peerStatus[peer.name].sequenceNumber = theirSequenceNumber
         return True
 
-    if sequenceNumber < peerStatus[peer.name].sequenceNumber: # Out of order packet
-        logger.warning(f'This seq={sequenceNumber} < last={peerStatus[peer.name].sequenceNumber} - skipping')
+    if theirSequenceNumber < mySequenceNumber: # Out of order packet
+        if theirSequenceNumber < mySequenceNumber-40000: # Most likely 16-bit number has wrapped
+            peerStatus[peer.name].sequenceNumber = theirSequenceNumber
+            return True
+
+        logger.warning(f'This seq={theirSequenceNumber} < last={mySequenceNumber} - skipping')
         return False
 
     #
     # Decide what to do based on RFC4696 Section 7
     #
     singlePacketLoss = False
-    if sequenceNumber > peerStatus[peer.name].sequenceNumber+1: # We have missed a packet somewhere
+    if theirSequenceNumber > mySequenceNumber+1: # We have missed a packet somewhere
         if not journal.header.a:
             logger.warning('Missed packets but no journal present - continuing')
-        elif sequenceNumber == peerStatus[peer.name].sequenceNumber-1 and journal.header.s: # Single packet loss
+        elif theirSequenceNumber == mySequenceNumber-1 and journal.header.s: # Single packet loss
             logger.warning('Single packet loss identified - continuing')
             singlePacketLoss = True
         else:
-            logger.warning(f'This seq={sequenceNumber} > last={peerStatus[peer.name].sequenceNumber} - processing journal')
+            logger.warning(f'This seq={theirSequenceNumber} > last={mySequenceNumber} - processing journal')
 
-    peerStatus[peer.name].sequenceNumber = sequenceNumber
+    peerStatus[peer.name].sequenceNumber = theirSequenceNumber
     if singlePacketLoss: return True
 
     logger.info('--- Journal handling ---')
