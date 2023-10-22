@@ -173,7 +173,7 @@ def handleJournal(peer, packet, alsaClient):
         logger.info('----------------------')
 
     if journal.header.a:
-        allJournals = journal.channel_journal
+        allJournals = journal.channel_journal.journal
         index = 0
 
         for channelNumber in range(journal.header.totchan+1):
@@ -197,43 +197,35 @@ def handleJournal(peer, packet, alsaClient):
             # way of doing this (my Python-fu is failing at this point).
             #
             logger.info(f' Loop {channelNumber+1} - index: {index} total length: {len(allJournals)}')
-            chapter = journal.channel_journal
-            try:
-                myByte = chapter[index]
-            except:
-                print('chapter failed')
+            if channelNumber: # This is not the first loop:
+                try:
+                    firstByte = allJournals[index]
+                    secondByte = allJournals[index+1]
+                    thirdByte = allJournals[index+2]
+            
+                    lengthMsb = firstByte & 0x07
+                    lengthLsb = secondByte
+            
+                    chapter = packets.MIDIChapterJournal(header={'s':firstByte & 0x80,
+                                                                 'chan':firstByte & 0x70,
+                                                                 'h':firstByte & 0x08,
+                                                                 'length': lengthMsb*256+lengthLsb,
+                                                                 'p':thirdByte & 0x80,
+                                                                 'c':thirdByte & 0x40,
+                                                                 'm':thirdByte & 0x20,
+                                                                 'w':thirdByte & 0x10,
+                                                                 'n':thirdByte & 0x08,
+                                                                 'e':thirdByte & 0x04,
+                                                                 't':thirdByte & 0x02,
+                                                                 'a':thirdByte & 0x01},
+                                                         journal = allJournals[index+3])
+                except Exception as e:
+                    logger.info(f'   Failed to decode chapter header: {e}')
+                    break
 
-            try:
-                firstByte = allJournals[index]
-            except:
-                print('allJournals failed')
-
-#            try:
-#                firstByte = allJournals[index]
-#                secondByte = allJournals[index+1]
-#                thirdByte = allJournals[index+2]
-#            
-#                lengthMsb = firstByte & 0x07
-#                lengthLsb = secondByte
-#            
-#                chapter = packets.MIDIChapterJournal(header={'s':firstByte & 0x80,
-#                                                             'chan':firstByte & 0x70,
-#                                                             'h':firstByte & 0x08,
-#                                                             'length': lengthMsb*256+lengthLsb,
-#                                                             'p':thirdByte & 0x80,
-#                                                             'c':thirdByte & 0x40,
-#                                                             'm':thirdByte & 0x20,
-#                                                             'w':thirdByte & 0x10,
-#                                                             'n':thirdByte & 0x08,
-#                                                             'e':thirdByte & 0x04,
-#                                                             't':thirdByte & 0x02,
-#                                                             'a':thirdByte & 0x01},
-#                                                     journal = allJournals[index+3])
-#            except Exception as e:
-#                logger.info(f'   Failed to decode chapter header: {e}')
-#                break
-
-            index += 3
+                index += 3
+            else:
+                chapter = allJournals
 
             midiChannel = chapter.header.chan
             logger.info(f'--- Chapter Journal for channel {midiChannel:2g} ---')
