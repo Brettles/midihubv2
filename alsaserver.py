@@ -192,9 +192,10 @@ def handleJournal(peer, packet, alsaClient):
             #
             logger.info(f' Loop {channelNumber+1} - index: {index} total length: {len(journal.header)-3}')
             try:
-                chapter = packets.MIDIChapterJournal.parse(journal[index:])
+                chapter = packets.MIDIChapterJournal.parse(bytes(journal[index:]))
             except Exception as e:
                 logger.error(f'  Failed to decode chapter journal: {e}')
+                break
 
             midiChannel = chapter.header.chan
             logger.info(f'--- Chapter Journal for channel {midiChannel:2g} ---')
