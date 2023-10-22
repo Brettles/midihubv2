@@ -124,7 +124,7 @@ class MyHandler(server.Handler):
 # which makes sense given how complex it is - there's a lot of time and effort
 # that goes into making this work reliably.
 #
-# I highly advise that you don't use this in a production environment. It is
+# I strongly advise that you don't use this in a production environment. It is
 # not rigorously tested.
 #
 def handleJournal(peer, packet, alsaClient):
@@ -157,7 +157,7 @@ def handleJournal(peer, packet, alsaClient):
     singlePacketLoss = False
     if theirSequenceNumber > mySequenceNumber+1: # We have missed a packet somewhere
         if not journal.header.a:
-            logger.warning('Missed packets but no journal present - continuing')
+            logger.warning('Missed packets but no chapter journal present - continuing')
         elif theirSequenceNumber == mySequenceNumber-1 and journal.header.s: # Single packet loss
             logger.warning('Single packet loss identified - continuing')
             singlePacketLoss = True
@@ -169,7 +169,10 @@ def handleJournal(peer, packet, alsaClient):
 
     logger.info('--- Journal handling ---')
   
-    if not journal.header.a and not journal.header.y: logger.info('  Empty journal')
+    if not journal.header.a and not journal.header.y:
+        logger.info('  Empty journal')
+        return
+
     if journal.header.s: logger.info('   Single packet loss flag - ignoring because handling multi packet loss')
     if journal.header.h: logger.info('   Enhanced chapter C encoding')
 
@@ -403,6 +406,7 @@ def handleJournal(peer, packet, alsaClient):
     #
     # Send feedback to the MIDI client (this is an Apple thing but everyone seems to do it)
     #
+    logger.info(f'Sending feedback to ssrc {hex(peer.ssrc) seqnum {journal.checkpoint_seqnum}}')
     try:
         packet = packets.AppleMIDIReceiverFeedbackPacket.create(ssrc=peer.ssrc,
                                                                 sequence_number=journal.checkpoint_seqnum)
