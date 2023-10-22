@@ -190,7 +190,7 @@ def handleJournal(peer, packet, alsaClient):
             # that the sender hasn't messed up any of the length headers -
             # which does happen so we abort if things don't "smell" right.
             #
-            logger.info(f' Loop {channelNumber+1} - index: {index} total length: {journal.header.length}')
+            logger.info(f' Loop {channelNumber+1} - index: {index} total length: {len(journal.header-3)}')
             try:
                 chapter = packets.MIDIChapterJournal.parse(journal[index:])
             except Exception as e:
