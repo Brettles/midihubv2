@@ -159,7 +159,7 @@ def handleJournal(peer, packet, alsaClient):
             logger.warning(f'This seq={sequenceNumber} > last={peerStatus[peer.name].sequenceNumber} - processing journal')
 
     peerStatus[peer.name].sequenceNumber = sequenceNumber
-    if singlePacketLoss: return true
+    if singlePacketLoss: return True
 
     logger.info('--- Journal handling ---')
   
@@ -172,34 +172,32 @@ def handleJournal(peer, packet, alsaClient):
         logger.info(journal.system_journal)
         logger.info('----------------------')
 
+    index = 0
     if journal.header.a:
         for channelNumber in range(journal.header.totchan+1):
+            alsaEvents = []
+
+            #
+            # Process the journal according to RFC6295
             #
             # Issue here is that the pymidi software only thinks there is a
             # single channel in the chapter journal but in reality there can
             # be more than one (hence the loop).
             #
-            # On the first loop the header is encoded into the structure but
-            # every subsequent loop the header will need to be extracted from
-            # the bit stream.
+            # So we will (re)parse the chapter journal from where we are in
+            # the whole journal based on the index - where we are counting
+            # our way through the journal, byte-by-byte. The hope here is
+            # that the sender hasn't messed up any of the length headers -
+            # which does happen so we abort if things don't "smell" right.
             #
-            if channelNumber == 0:
-                chapter = journal.channel_journal # Called a Chapter Journal in the RFC
-            else:
-                logger.warning(f'*** There are {journal.header.totchan} channels here but we only deal with one')
-                break # Not right but we'll deal with it later
+            logger.info(f' Loop {channelNumber+1} - index: {index} total length: {journal.header.length}')
+            try:
+                chapter = packets.MIDIChapterJournal.parse(journal[index:])
+            except Exception as e:
+                logger.error(f'  Failed to decode chapter journal: {e}')
 
             midiChannel = chapter.header.chan
             logger.info(f'--- Chapter Journal for channel {midiChannel:2g} ---')
-
-            #
-            # Process the journal according to RFC6295
-            # This first cut does not loop through the journal as it should so
-            # if there are multiple channels we may miss something - the logging
-            # will reflect that.
-            #
-            index = 0
-            alsaEvents = []
     
             if chapter.header.p: # Fixed size of three octets - Appendix A.2
                 index += 3
@@ -239,7 +237,7 @@ def handleJournal(peer, packet, alsaClient):
 
                 pitchWheelValue = wheelCoarse*256+wheelFine
                 index += 2
-                logger.info(f'    Pitch wheel change to {pitchWheelValue}')
+                logger.info(f'    Pitch wheel is {pitchWheelValue}')
 
                 existingValue = peerStatus[peer.name].channelInfo[midiChannel]['pitchWheel']
                 if existingValue != pitchWheelValue:
