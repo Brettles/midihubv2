@@ -225,7 +225,7 @@ def handleJournal(peer, packet, alsaClient):
 
                 index += 3
             else:
-                chapter = allJournals
+                chapter = journal.channel_journal
 
             midiChannel = chapter.header.chan
             logger.info(f'--- Chapter Journal for channel {midiChannel:2g} ---')
