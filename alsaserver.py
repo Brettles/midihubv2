@@ -406,10 +406,9 @@ def handleJournal(peer, packet, alsaClient):
     #
     # Send feedback to the MIDI client (this is an Apple thing but everyone seems to do it)
     #
-    logger.info(f'Sending feedback to ssrc {hex(peer.ssrc) seqnum {journal.checkpoint_seqnum}}')
     try:
         packet = packets.AppleMIDIReceiverFeedbackPacket.create(ssrc=peer.ssrc,
-                                                                sequence_number=journal.checkpoint_seqnum)
+                                                                sequence_number=journal.mySequenceNumber)
     except Exception as e:
         logger.error(f'Failed to create ReceiverFeedback packet: {e}')
     else:
