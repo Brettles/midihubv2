@@ -196,7 +196,7 @@ def handleJournal(peer, packet, alsaClient):
             # the pymidi structure because in future I might find an easier
             # way of doing this (my Python-fu is failing at this point).
             #
-            logger.info(f' Loop {channelNumber+1} - index: {index} total length: {len(allJournals)}')
+            logger.info(f' Loop {channelNumber+1} - index: {index} total length: {len(journal.channel_journal)}')
             if channelNumber: # This is not the first loop:
                 try:
                     firstByte = allJournals[index]
