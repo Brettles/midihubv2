@@ -145,6 +145,12 @@ Resources:
       IamInstanceProfile: !Ref InstanceProfile
       SecurityGroupIds:
       - !Ref SecurityGroup
+      BlockDeviceMappings:
+      - DeviceName: "/dev/nvme0n1"
+        Ebs:
+          VolumeType: "gp3"
+          VolumeSize: 30
+          Iops: 3000
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
@@ -157,6 +163,7 @@ Resources:
           /usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource MidiHubInstance --region ${AWS::Region}
           /usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MidiHubInstance --region ${AWS::Region}
           apt-get install alsa-base avahi-utils linux-modules-6.2.0-1013-lowlatency -y
+          apt-get remove unattended-upgrades -y
           pip3 install boto3 alsa-midi construct
           cd /home/ubuntu
           git clone https://github.com/Brettles/midihubv2
@@ -323,14 +330,6 @@ Resources:
             - sts:AssumeRole
       ManagedPolicyArns:
       - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-              - lambda.amazonaws.com
-            Action:
-            - sts:AssumeRole
       Policies:
       - PolicyName: SQS
         PolicyDocument:
