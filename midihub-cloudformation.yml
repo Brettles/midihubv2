@@ -146,7 +146,7 @@ Resources:
       SecurityGroupIds:
       - !Ref SecurityGroup
       BlockDeviceMappings:
-      - DeviceName: "/dev/nvme0n1"
+      - DeviceName: "/dev/sda1"
         Ebs:
           VolumeType: "gp3"
           VolumeSize: 30
