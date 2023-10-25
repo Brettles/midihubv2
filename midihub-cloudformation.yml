@@ -35,13 +35,13 @@ Outputs:
     Value: !Ref ElasticIP
   GlobalIP:
     Description: Globally available IP addresses of MIDI hub server
-    Value: !Join [',', !GetAtt GlobalAccelerator.Ipv4Addresses]
+    Value: !Join [",", !GetAtt GlobalAccelerator.Ipv4Addresses]
   CloudFrontDistribution:
     Value: !Ref CloudFrontDistribution
   LatencyStatisticsPage:
-    Value: !Sub 'https://${CloudFrontDistribution.DomainName}/latency.html'
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}/latency.html"
   ResetStuckNotesPage:
-    Value: !Sub 'https://${CloudFrontDistribution.DomainName}/fixstucknotes.html'
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}/fixstucknotes.html"
   APIGatewayEndpoint:
     Description: Substitute into latency.html
     Value: !Sub ${APIGateway.ApiEndpoint}
@@ -116,14 +116,14 @@ Resources:
           files:
             "/home/ubuntu/cloudformationstackname":
               content: !Sub ${AWS::StackName}
-              mode: '000644'
+              mode: "000644"
               owner: ubuntu
               group: ubuntu
             "/home/ubuntu/.aws/config":
               content: !Sub |
                 [default]
                 region = ${AWS::Region}
-              mode: '000644'
+              mode: "000644"
               owner: ubuntu
               group: ubuntu
             "/home/ubuntu/crontab.ubuntu":
@@ -132,7 +132,7 @@ Resources:
                 * * * * * (cd /home/ubuntu/midihubv2/; ./midihub.py) >>/home/ubuntu/midihub-output.log 2>&1
                 * * * * * (cd /home/ubuntu/midihubv2/; ./fix-stuck-notes.py) >>/home/ubuntu/fixstuck-output.log 2>&1
                 * * * * * (cd /home/ubuntu; grep rtt *.log | ./midihubv2/update-latency.py)
-              mode: '000644'
+              mode: "000644"
               owner: ubuntu
               group: ubuntu
     Properties:
@@ -173,7 +173,7 @@ Resources:
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub 'midiHubv2-${AWS::StackName}'
+      GroupName: !Sub "midiHubv2-${AWS::StackName}"
       GroupDescription: Enable SSH and RTP for MIDI
       SecurityGroupIngress:
       - IpProtocol: tcp
@@ -198,7 +198,7 @@ Resources:
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 'midiHubv2-EC2-${AWS::StackName}'
+      RoleName: !Sub "midiHubv2-EC2-${AWS::StackName}"
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -236,14 +236,14 @@ Resources:
             Action:
             - cloudfront:GetDistributionConfig
             - cloudfront:UpdateDistribution
-            Resource: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+            Resource: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
       - PolicyName: CloudFrontOAC
         PolicyDocument:
           Version: 2012-10-17
           Statement:
           - Effect: Allow
             Action: cloudfront:CreateOriginAccessControl
-            Resource: '*'
+            Resource: "*"
       - PolicyName: S3
         PolicyDocument:
           Version: 2012-10-17
@@ -253,7 +253,7 @@ Resources:
             - s3:CreateBucket
             - s3:PutBucketPolicy
             - s3:PutObject
-            Resource: '*'
+            Resource: "*"
       - PolicyName: SQS
         PolicyDocument:
           Version: 2012-10-17
@@ -262,12 +262,12 @@ Resources:
             Action:
             - sqs:ReceiveMessage
             - sqs:DeleteMessage
-            Resource: '*'
+            Resource: "*"
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties: 
-      InstanceProfileName: !Sub 'midiHubv2-${AWS::StackName}'
+      InstanceProfileName: !Sub "midiHubv2-${AWS::StackName}"
       Path: /
       Roles: 
       - !Ref InstanceRole
@@ -275,7 +275,7 @@ Resources:
   DynamoDBTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub 'midiHubv2-${AWS::StackName}'
+      TableName: !Sub "midiHubv2-${AWS::StackName}"
       AttributeDefinitions:
       - AttributeName: clientId
         AttributeType: S
@@ -290,7 +290,7 @@ Resources:
   SQSQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub 'midihubv2-${AWS::StackName}'
+      QueueName: !Sub "midihubv2-${AWS::StackName}"
       ReceiveMessageWaitTimeSeconds: 5
 
   SQSQueuePolicy:
@@ -312,7 +312,7 @@ Resources:
   LambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 'midiHubv2-Lambda-${AWS::StackName}'
+      RoleName: !Sub "midiHubv2-Lambda-${AWS::StackName}"
       AssumeRolePolicyDocument:
         Statement:
         - Effect: Allow
@@ -322,7 +322,7 @@ Resources:
             Action:
             - sts:AssumeRole
       ManagedPolicyArns:
-      - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -353,7 +353,7 @@ Resources:
   LambdaGetLatencyStats:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub 'midiHubv2-GetLatencyStats-${AWS::StackName}'
+      FunctionName: !Sub "midiHubv2-GetLatencyStats-${AWS::StackName}"
       Handler: index.lambda_handler
       Runtime: python3.11
       Architectures: [arm64]
@@ -420,7 +420,7 @@ Resources:
   LambdaResetStuckNote:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub 'midiHubv2-ResetStuckNote-${AWS::StackName}'
+      FunctionName: !Sub "midiHubv2-ResetStuckNote-${AWS::StackName}"
       Handler: index.lambda_handler
       Runtime: python3.11
       Architectures: [arm64]
@@ -475,7 +475,7 @@ Resources:
   LambdaGetTransmitPorts:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub 'midiHubv2-GetTransmitPorts-${AWS::StackName}'
+      FunctionName: !Sub "midiHubv2-GetTransmitPorts-${AWS::StackName}"
       Handler: index.lambda_handler
       Runtime: python3.11
       Architectures: [arm64]
@@ -516,7 +516,7 @@ Resources:
   APIGateway:
     Type: AWS::ApiGatewayV2::Api
     Properties:
-      Name: !Sub 'midiHubv2-${AWS::StackName}'
+      Name: !Sub "midiHubv2-${AWS::StackName}"
       ProtocolType: HTTP
       CorsConfiguration:
         AllowHeaders:
@@ -610,7 +610,7 @@ Resources:
   GlobalAccelerator:
     Type: AWS::GlobalAccelerator::Accelerator
     Properties:
-      Name: !Sub 'mibiHubv2-${AWS::StackName}'
+      Name: !Sub "mibiHubv2-${AWS::StackName}"
       IpAddressType: IPV4
       Enabled: True
 
@@ -645,11 +645,11 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        Comment: !Sub 'mibiHubv2-${AWS::StackName}'
+        Comment: !Sub "mibiHubv2-${AWS::StackName}"
         DefaultRootObject: index.html
         Enabled: true
         HttpVersion: http2
-        PriceClass: 'PriceClass_All'
+        PriceClass: "PriceClass_All"
         Origins:
         - Id: DefaultOrigin
           DomainName: aws.amazon.com
@@ -663,6 +663,6 @@ Resources:
           TargetOriginId: DefaultOrigin
           ViewerProtocolPolicy: redirect-to-https
           ForwardedValues:
-            QueryString: 'false'
+            QueryString: False
             Cookies:
               Forward: none
