@@ -57,6 +57,7 @@ class peerInfo():
                 if now - pitchWheelTime > noteTimeout:
                     self.logger.info(f'Pitch wheel stuck on channel {channel} - resetting')
                     alsaClient.event_output(alsa_midi.PitchBendEvent(value=defaultPitchWheel, channel=channel))
+                    alsaClient.drain_output()
                     self.channelInfo[channel]['pitchWheelTime'] = None
 
             for noteNumber in range(128):
@@ -65,6 +66,7 @@ class peerInfo():
                     if now - noteOnTime > noteTimeout:
                         self.logger.info(f'Note {noteNumber} stuck on channel {channel} - resetting')
                         alsaClient.event_output(alsa_midi.NoteOffEvent(note=noteNumber, velocity=0, channel=channel))
+                        alsaClient.drain_output()
                         self.channelInfo[channel]['noteOnTime'][noteNumber] = None
 
 class MyHandler(server.Handler):
