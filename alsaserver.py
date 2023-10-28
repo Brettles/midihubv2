@@ -44,7 +44,7 @@ class peerInfo():
         noteNumber = int(note)
         self.channelInfo[channel]['noteOnTime'][noteNumber] = time.time()
 
-    def noteOn(self, channel, note):
+    def noteOff(self, channel, note):
         noteNumber = int(note)
         self.channelInfo[channel]['noteOnTime'][noteNumber] = None
 
