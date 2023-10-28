@@ -67,7 +67,7 @@ def main():
                 logger.info(f'Sending NoteOff to {port} for {portRanges[resetRange]}')
 
                 for midiNote in portRanges[resetRange]:
-                    for chan in range(0, 16):
+                    for chan in range(16):
                         event = alsa_midi.NoteOffEvent(note=midiNote, velocity=64, channel=chan)
                         alsaClients[port].event_output(event)
                         if not chan%8: alsaClients[port].drain_output()
