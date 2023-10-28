@@ -65,7 +65,7 @@ class peerInfo():
                 if noteOnTime:
                     if now - noteOnTime > noteTimeout:
                         self.logger.info(f'Note {noteNumber} stuck on channel {channel} - resetting')
-                        alsaClient.event_output(alsa_midi.NoteOffEvent(note=noteNumber, velocity=0, channel=channel))
+                        alsaClient.event_output(alsa_midi.NoteOffEvent(note=noteNumber, velocity=64, channel=channel))
                         alsaClient.drain_output()
                         self.channelInfo[channel]['noteOnTime'][noteNumber] = None
 
@@ -112,8 +112,6 @@ class MyHandler(server.Handler):
             self.alsaClient.drain_output()
 
 def rawServer(midiPort, midiName):
-    global outputSocket
-
     alsaClient = alsa_midi.SequencerClient(midiName)
     alsaPort = alsaClient.create_port(midiName)
 
