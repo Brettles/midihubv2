@@ -36,7 +36,6 @@ def main():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
-    randomName = 'midihubv2-'+''.join(random.choice(randomSource) for i in range(16))
     logger.info(f'Random bucket name: {randomName}')
 
     try:
@@ -163,7 +162,7 @@ def main():
     logger.info(f'Created S3 bucket {randomName} and updated origin {config["ETag"]}')
 
 def copyFileToS3(s3, filename):
-    global logger, apiGatewayEndpoint
+    global logger, apiGatewayEndpoint, randomName
 
     try:
         with open(filename) as webfile:
