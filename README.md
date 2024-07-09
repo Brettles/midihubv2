@@ -37,7 +37,7 @@ EC2 instance pricing [can be found here](https://aws.amazon.com/ec2/pricing/on-d
 
 ## Deploy the CloudFormation template
 
-To deploy in AWS, go to the [CloudFromation console](https://console.aws.amazon.com/cloudformation/) and make sure you're deploying in the right AWS region. Typically you want to choose the region which is the lowest latency (over the internet) between all of the participants and that region. Then choose "Create stack" and when asked, upload the template file from this repo.
+To deploy in AWS, go to the [CloudFormation console](https://console.aws.amazon.com/cloudformation/) and make sure you're deploying in the right AWS region. Typically you want to choose the region which is the lowest latency (over the internet) between all of the participants and that region. Then choose "Create stack" and when asked, upload the template file from this repo.
 
 You'll be asked for the instance type 
 
